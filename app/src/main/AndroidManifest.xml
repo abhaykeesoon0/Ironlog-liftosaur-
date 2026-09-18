@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============================================================
+         DEVICE INTEGRATION 1 - CAMERA (progress photos, avatar)
+         ============================================================ -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- ============================================================
+         DEVICE INTEGRATION 2 - GPS / LOCATION (cardio route tracking)
+         ============================================================ -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- ============================================================
+         DEVICE INTEGRATION 3 - SENSORS (rep counting, step counting)
+         ============================================================ -->
+    <uses-permission
+        android:name="android.permission.ACTIVITY_RECOGNITION"
+        android:minSdkVersion="29" />
+
+    <!-- ============================================================
+         DEVICE INTEGRATION 4 - NOTIFICATIONS (rest timer, reminders)
+         ============================================================ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- ============================================================
+         DEVICE INTEGRATION 5 - FILE STORAGE (photo + CSV/JSON export)
+         ============================================================ -->
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_IMAGES"
+        android:minSdkVersion="33" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!-- Foreground services -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Biometric app lock -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- Hardware is used where present but is not required to install -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
+
+    <application
+        android:name=".IronLogApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.IronLog"
+        tools:targetApi="35">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.IronLog"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Keeps GPS sampling alive while an outdoor cardio session records -->
+        <service
+            android:name=".core.location.CardioTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- Keeps the rest countdown accurate when the screen is off -->
+        <service
+            android:name=".core.notifications.RestTimerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Counts down the rest interval between sets while the user is mid-workout." />
+        </service>
+
+        <receiver
+            android:name=".core.notifications.NotificationActionReceiver"
+            android:exported="false" />
+
+        <!-- Scoped sharing of captured photos and exported data files -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+</manifest>

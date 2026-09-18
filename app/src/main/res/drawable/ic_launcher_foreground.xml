@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- bar -->
+    <path android:fillColor="#F2F5F7" android:pathData="M30,52h48v4h-48z" />
+    <!-- inner collars -->
+    <path android:fillColor="#F2F5F7" android:pathData="M32,46h5v16h-5z" />
+    <path android:fillColor="#F2F5F7" android:pathData="M71,46h5v16h-5z" />
+    <!-- plates -->
+    <path android:fillColor="#E03131" android:pathData="M24,38h6v32h-6z" />
+    <path android:fillColor="#1C7ED6" android:pathData="M78,38h6v32h-6z" />
+    <path android:fillColor="#F2B705" android:pathData="M18,44h5v20h-5z" />
+    <path android:fillColor="#F2B705" android:pathData="M85,44h5v20h-5z" />
+</vector>

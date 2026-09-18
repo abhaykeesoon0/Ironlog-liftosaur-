@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IronLog</string>
+    <string name="channel_rest_timer">Rest timer</string>
+    <string name="channel_rest_timer_desc">Counts down your rest between sets</string>
+    <string name="channel_reminders">Workout reminders</string>
+    <string name="channel_reminders_desc">Nudges on days you planned to train</string>
+    <string name="channel_cardio">Cardio tracking</string>
+    <string name="channel_cardio_desc">Shows distance and pace while a route records</string>
+</resources>
