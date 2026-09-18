@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+**/build/
+.kotlin/
+
+# Machine-specific SDK path -- never commit
+local.properties
+
+# Android Studio / IntelliJ: ignore everything except shared code style
+.idea/*
+!.idea/codeStyles/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Build outputs and signing
+*.apk
+*.aab
+*.ap_
+*.dex
+*.jks
+*.keystore
+
+# Logs and OS clutter
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Note: app/schemas/ is deliberately tracked -- Room needs the exported schema
+# history to write and test migrations.

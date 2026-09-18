@@ -1,0 +1,7 @@
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.**
+-keepclassmembers class kotlinx.serialization.json.** { *; }
+-keep,includedescriptorclasses class com.ironlog.app.**$$serializer { *; }
+-keepclassmembers class com.ironlog.app.** { *** Companion; }
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
