@@ -8,6 +8,7 @@ import com.ironlog.app.data.dao.CardioDao
 import com.ironlog.app.data.dao.ExerciseDao
 import com.ironlog.app.data.dao.PersonalRecordDao
 import com.ironlog.app.data.dao.RoutineDao
+import com.ironlog.app.data.dao.StrengthGoalDao
 import com.ironlog.app.data.dao.UserDao
 import com.ironlog.app.data.dao.WorkoutDao
 import com.ironlog.app.data.entity.BodyMeasurementEntity
@@ -18,6 +19,7 @@ import com.ironlog.app.data.entity.PersonalRecordEntity
 import com.ironlog.app.data.entity.ProgressPhotoEntity
 import com.ironlog.app.data.entity.RoutineEntity
 import com.ironlog.app.data.entity.RoutineExerciseEntity
+import com.ironlog.app.data.entity.StrengthGoalEntity
 import com.ironlog.app.data.entity.UserEntity
 import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.entity.WorkoutExerciseEntity
@@ -42,9 +44,10 @@ import com.ironlog.app.data.entity.WorkoutSetEntity
         BodyMeasurementEntity::class,
         ProgressPhotoEntity::class,
         CardioSessionEntity::class,
-        DailyActivityEntity::class
+        DailyActivityEntity::class,
+        StrengthGoalEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -56,6 +59,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun personalRecordDao(): PersonalRecordDao
     abstract fun bodyDao(): BodyDao
     abstract fun cardioDao(): CardioDao
+    abstract fun strengthGoalDao(): StrengthGoalDao
 
     companion object {
         const val NAME = "ironlog.db"

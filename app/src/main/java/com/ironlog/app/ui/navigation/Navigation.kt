@@ -42,6 +42,7 @@ import com.ironlog.app.ui.screens.exercises.ExerciseDetailScreen
 import com.ironlog.app.ui.screens.exercises.ExerciseLibraryScreen
 import com.ironlog.app.ui.screens.history.HistoryScreen
 import com.ironlog.app.ui.screens.history.WorkoutDetailScreen
+import com.ironlog.app.ui.screens.goals.StrengthGoalsScreen
 import com.ironlog.app.ui.screens.home.HomeScreen
 import com.ironlog.app.ui.screens.profile.ChangePasswordScreen
 import com.ironlog.app.ui.screens.profile.ProfileScreen
@@ -71,6 +72,7 @@ object Routes {
     const val EXERCISE_DETAIL = "exercises/{id}"
     const val WORKOUT_DETAIL = "history/{id}?justFinished={justFinished}"
     const val BODY = "body"
+    const val STRENGTH_GOALS = "goals"
     const val PHOTOS = "photos"
     const val CARDIO = "cardio"
     const val CARDIO_TRACK = "cardio/track"
@@ -181,7 +183,8 @@ fun MainNavHost(
                     onOpenRoutines = { navController.navigateToTab(Routes.ROUTINES) },
                     onOpenCardio = { navController.navigate(Routes.CARDIO) },
                     onOpenWorkout = { navController.navigate(Routes.workoutDetail(it)) },
-                    onOpenBody = { navController.navigate(Routes.BODY) }
+                    onOpenBody = { navController.navigate(Routes.BODY) },
+                    onOpenGoals = { navController.navigate(Routes.STRENGTH_GOALS) }
                 )
             }
             composable(Routes.ROUTINES) {
@@ -253,6 +256,15 @@ fun MainNavHost(
                         navController.popBackStack()
                     },
                     onOpenExercise = { navController.navigate(Routes.exerciseDetail(it)) }
+                )
+            }
+            composable(Routes.STRENGTH_GOALS) { entry ->
+                val picked by entry.pickedExercises()
+                StrengthGoalsScreen(
+                    onBack = { navController.popBackStack() },
+                    onPickExercise = { navController.navigate(Routes.exerciseLibrary(pick = true)) },
+                    pickedExerciseIds = picked,
+                    onPickedConsumed = { entry.savedStateHandle[Routes.PICKED_EXERCISES] = null }
                 )
             }
             composable(Routes.EXERCISE_DETAIL) {

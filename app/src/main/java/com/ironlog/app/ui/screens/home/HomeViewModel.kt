@@ -8,9 +8,11 @@ import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.repository.BodyRepository
 import com.ironlog.app.data.repository.CardioRepository
+import com.ironlog.app.data.repository.StrengthGoalRepository
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.WorkoutRepository
 import com.ironlog.app.data.repository.userMessage
+import com.ironlog.app.domain.usecase.Recovery
 import com.ironlog.app.domain.usecase.TrainingMath
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -45,6 +47,7 @@ data class HomeUiState(
     val lastWorkout: WorkoutEntity? = null,
     val recentBlock: TrainingMath.BlockSummary = TrainingMath.BlockSummary(),
     val bodyweight: List<BodyweightPoint> = emptyList(),
+    val recovery: List<Recovery.MuscleState> = emptyList(),
     val recentRecords: List<RecordWithExercise> = emptyList(),
     val error: String? = null
 )
@@ -55,6 +58,7 @@ class HomeViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val cardioRepository: CardioRepository,
     private val bodyRepository: BodyRepository,
+    private val goalRepository: StrengthGoalRepository,
     private val stepCounter: StepCounter
 ) : ViewModel() {
 
@@ -143,6 +147,19 @@ class HomeViewModel @Inject constructor(
                         .mapNotNull { m -> m.weightKg?.let { BodyweightPoint(m.takenAt, it) } }
                         .sortedBy { it.takenAt }
                     _state.update { it.copy(bodyweight = points) }
+                }
+        }
+
+        viewModelScope.launch {
+            goalRepository.observeMuscleSessions()
+                .catch { e -> _state.update { it.copy(error = e.userMessage("Could not work out your recovery")) } }
+                .collect { rows ->
+                    val sessions = rows.map { row ->
+                        Recovery.MuscleSession(row.muscle, row.trainedAt, row.volume)
+                    }
+                    // The clock is read here rather than inside the calculation so
+                    // the maths stays a pure function of its inputs.
+                    _state.update { it.copy(recovery = Recovery.states(sessions, System.currentTimeMillis())) }
                 }
         }
 

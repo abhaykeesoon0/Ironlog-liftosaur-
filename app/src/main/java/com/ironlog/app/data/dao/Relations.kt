@@ -3,6 +3,8 @@ package com.ironlog.app.data.dao
 import androidx.room.Embedded
 import androidx.room.Relation
 import com.ironlog.app.data.entity.ExerciseEntity
+import com.ironlog.app.data.entity.MuscleGroup
+import com.ironlog.app.data.entity.StrengthGoalEntity
 import com.ironlog.app.data.entity.PersonalRecordEntity
 import com.ironlog.app.data.entity.RoutineEntity
 import com.ironlog.app.data.entity.RoutineExerciseEntity
@@ -60,6 +62,18 @@ data class HistoricSet(
     @Embedded val set: WorkoutSetEntity,
     val workoutId: String,
     val startedAt: Long
+)
+
+data class GoalWithExercise(
+    @Embedded val goal: StrengthGoalEntity,
+    val exerciseName: String
+)
+
+/** One muscle's working volume within one session. */
+data class MuscleSessionRow(
+    val muscle: MuscleGroup,
+    val trainedAt: Long,
+    val volume: Double
 )
 
 data class RecordWithExercise(

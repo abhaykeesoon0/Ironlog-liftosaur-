@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ironlog.app.core.permissions.AppPermission
 import com.ironlog.app.core.permissions.rememberPermissionState
+import com.ironlog.app.data.entity.UnitSystem
+import com.ironlog.app.domain.usecase.Recovery
 import com.ironlog.app.ui.components.Caption
 import com.ironlog.app.ui.components.ChartPoint
 import com.ironlog.app.ui.components.ErrorBanner
@@ -51,9 +53,12 @@ import com.ironlog.app.ui.format.formatClock
 import com.ironlog.app.ui.format.formatDuration
 import com.ironlog.app.ui.format.formatRelativeDay
 import com.ironlog.app.ui.format.formatShortDate
+import com.ironlog.app.ui.format.formatWeight
 import com.ironlog.app.ui.format.formatVolume
 import com.ironlog.app.ui.format.trimmed
 import com.ironlog.app.ui.format.weightValue
+import com.ironlog.app.ui.screens.goals.GoalCard
+import com.ironlog.app.ui.screens.goals.HomeGoalsViewModel
 import com.ironlog.app.ui.screens.exercises.formatRecordContext
 import com.ironlog.app.ui.screens.exercises.formatRecordValue
 import com.ironlog.app.ui.theme.Chalk
@@ -74,9 +79,12 @@ fun HomeScreen(
     onOpenCardio: () -> Unit,
     onOpenWorkout: (String) -> Unit,
     onOpenBody: () -> Unit,
-    viewModel: HomeViewModel = hiltViewModel()
+    onOpenGoals: () -> Unit,
+    viewModel: HomeViewModel = hiltViewModel(),
+    goalsViewModel: HomeGoalsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val goals by goalsViewModel.goals.collectAsStateWithLifecycle()
     val stepsPermission = rememberPermissionState(AppPermission.ACTIVITY_RECOGNITION)
     val stepsEnabled = state.stepSensorAvailable && stepsPermission.isGranted
 
@@ -200,6 +208,47 @@ fun HomeScreen(
                     Caption("Record a run, walk or ride with GPS")
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
+            }
+        }
+
+        if (state.recovery.isNotEmpty()) {
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Recovery")
+            IronCard {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                    state.recovery.take(RECOVERY_ROWS).forEach { muscle ->
+                        RecoveryRow(muscle)
+                    }
+                    val hidden = state.recovery.size - RECOVERY_ROWS
+                    if (hidden > 0) Caption("$hidden more fully recovered")
+                }
+            }
+        }
+
+        if (goals.isNotEmpty()) {
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Strength goals")
+            IronCard(onClick = onOpenGoals) {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.lg)) {
+                    goals.take(HOME_GOALS).forEach { goal ->
+                        GoalSummaryRow(goal, state.unit)
+                    }
+                    val hidden = goals.size - HOME_GOALS
+                    if (hidden > 0) Caption("$hidden more")
+                }
+            }
+        } else {
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Strength goals")
+            IronCard(onClick = onOpenGoals) {
+                Column {
+                    Text(
+                        "Set a target on a lift",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Chalk
+                    )
+                    Caption("Track the share of it you have reached, read straight from your logged sets.")
+                }
             }
         }
 
@@ -338,5 +387,96 @@ private fun ActiveWorkoutCard(active: ActiveWorkoutInfo, onResume: () -> Unit) {
             Spacer(Modifier.height(Space.md))
             PrimaryButton(text = "Resume", onClick = onResume, leadingIcon = Icons.Default.PlayArrow)
         }
+    }
+}
+
+/** How many muscles the Home card lists before it stops. */
+private const val RECOVERY_ROWS = 5
+
+/** How many goals Home shows before sending the user to the full screen. */
+private const val HOME_GOALS = 3
+
+/**
+ * One muscle's recovery.
+ *
+ * The bar carries the reading twice over: it fills as the muscle recovers, and
+ * its colour comes back with it, faint just after training and solid once the
+ * muscle is ready. Green is a data colour here, not decoration.
+ */
+@Composable
+private fun RecoveryRow(muscle: Recovery.MuscleState) {
+    val percent = (muscle.fraction * 100).toInt()
+    val status = if (muscle.isFresh) "Fresh" else "$percent% · ${muscle.hoursRemaining}h left"
+
+    Column(
+        Modifier.semantics(mergeDescendants = true) {
+            contentDescription = "${muscle.muscle.label}: " +
+                if (muscle.isFresh) "recovered" else "$percent percent recovered, ${muscle.hoursRemaining} hours left"
+        }
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(muscle.muscle.label, style = MaterialTheme.typography.bodyMedium, color = Chalk)
+            Text(
+                status,
+                style = NumericType.small,
+                color = if (muscle.isFresh) ChalkDim else ChalkFaint
+            )
+        }
+        Spacer(Modifier.height(Space.xs))
+        LinearProgressIndicator(
+            progress = { muscle.fraction },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            // Alpha rises with recovery: worked muscles read as drained, and the
+            // colour returns as they come back.
+            color = Plate10.copy(alpha = RECOVERY_MIN_ALPHA + (1f - RECOVERY_MIN_ALPHA) * muscle.fraction),
+            trackColor = Slate700,
+            drawStopIndicator = {}
+        )
+    }
+}
+
+/** Faintest a recovery bar goes, so a just-trained muscle is still visible. */
+private const val RECOVERY_MIN_ALPHA = 0.3f
+
+/** A goal on Home: the numbers and the bar, without the chart. */
+@Composable
+private fun GoalSummaryRow(goal: GoalCard, unit: UnitSystem) {
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                goal.exerciseName,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Chalk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(Space.sm))
+            Text(
+                "${(goal.progress * 100).toInt()}%",
+                style = NumericType.small,
+                color = if (goal.isAchieved) PrGold else ChalkDim
+            )
+        }
+        Spacer(Modifier.height(Space.xs))
+        LinearProgressIndicator(
+            progress = { goal.progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .semantics {
+                    contentDescription = "${goal.exerciseName}, ${(goal.progress * 100).toInt()} percent of " +
+                        unit.formatWeight(goal.targetKg)
+                },
+            color = if (goal.isAchieved) PrGold else Plate10,
+            trackColor = Slate700,
+            drawStopIndicator = {}
+        )
+        Spacer(Modifier.height(Space.xs))
+        Caption("${unit.formatWeight(goal.currentKg)} of ${unit.formatWeight(goal.targetKg)} · ${goal.metric.shortLabel}")
     }
 }
