@@ -46,6 +46,8 @@ import com.ironlog.app.ui.components.ErrorBanner
 import com.ironlog.app.ui.components.LoadingBlock
 import com.ironlog.app.ui.components.PrimaryButton
 import com.ironlog.app.ui.navigation.AuthNavHost
+import com.ironlog.app.ui.screens.rewards.EquippedViewModel
+import com.ironlog.app.ui.screens.rewards.backgroundColour
 import com.ironlog.app.ui.navigation.MainNavHost
 import com.ironlog.app.ui.theme.Chalk
 import com.ironlog.app.ui.theme.ChalkDim
@@ -70,6 +72,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var biometricGate: BiometricGate
 
     private val mainViewModel: MainViewModel by viewModels()
+    private val equippedViewModel: EquippedViewModel by viewModels()
 
     /** Route handed over by a notification tap, consumed once by the nav host. */
     private var deepLinkRoute by mutableStateOf<String?>(null)
@@ -85,7 +88,10 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            IronLogTheme {
+            // The equipped background is read here, at the root, so a colour
+            // bought in the store applies to every screen at once.
+            val equipped by equippedViewModel.equipped.collectAsStateWithLifecycle()
+            IronLogTheme(background = backgroundColour(equipped.backgroundId)) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

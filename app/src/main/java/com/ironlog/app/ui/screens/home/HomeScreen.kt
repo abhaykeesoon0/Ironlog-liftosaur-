@@ -24,12 +24,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -39,10 +43,12 @@ import com.ironlog.app.core.permissions.AppPermission
 import com.ironlog.app.core.permissions.rememberPermissionState
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.domain.usecase.Recovery
+import com.ironlog.app.domain.usecase.TrainingMath
 import com.ironlog.app.ui.components.Caption
 import com.ironlog.app.ui.components.ChartPoint
 import com.ironlog.app.ui.components.ErrorBanner
 import com.ironlog.app.ui.components.IronCard
+import com.ironlog.app.ui.components.IronTextField
 import com.ironlog.app.ui.components.LineChart
 import com.ironlog.app.ui.components.PrBadge
 import com.ironlog.app.ui.components.PrimaryButton
@@ -59,6 +65,10 @@ import com.ironlog.app.ui.format.trimmed
 import com.ironlog.app.ui.format.weightValue
 import com.ironlog.app.ui.screens.goals.GoalCard
 import com.ironlog.app.ui.screens.goals.HomeGoalsViewModel
+import com.ironlog.app.ui.screens.rewards.CoinPill
+import com.ironlog.app.ui.screens.rewards.EquippedViewModel
+import com.ironlog.app.ui.screens.rewards.QuestsViewModel
+import com.ironlog.app.ui.screens.rewards.badgeIcon
 import com.ironlog.app.ui.screens.exercises.formatRecordContext
 import com.ironlog.app.ui.screens.exercises.formatRecordValue
 import com.ironlog.app.ui.theme.Chalk
@@ -80,11 +90,16 @@ fun HomeScreen(
     onOpenWorkout: (String) -> Unit,
     onOpenBody: () -> Unit,
     onOpenGoals: () -> Unit,
+    onOpenQuests: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
-    goalsViewModel: HomeGoalsViewModel = hiltViewModel()
+    goalsViewModel: HomeGoalsViewModel = hiltViewModel(),
+    questsViewModel: QuestsViewModel = hiltViewModel(),
+    equippedViewModel: EquippedViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val goals by goalsViewModel.goals.collectAsStateWithLifecycle()
+    val quests by questsViewModel.state.collectAsStateWithLifecycle()
+    val equipped by equippedViewModel.equipped.collectAsStateWithLifecycle()
     val stepsPermission = rememberPermissionState(AppPermission.ACTIVITY_RECOGNITION)
     val stepsEnabled = state.stepSensorAvailable && stepsPermission.isGranted
 
@@ -103,13 +118,20 @@ fun HomeScreen(
     ) {
         Spacer(Modifier.height(Space.xl))
         Text(state.greeting, style = MaterialTheme.typography.bodyMedium, color = ChalkDim)
-        Text(
-            text = state.displayName.ifBlank { "Lifter" },
-            style = MaterialTheme.typography.displayMedium,
-            color = Chalk,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = state.displayName.ifBlank { "Lifter" },
+                style = MaterialTheme.typography.displayMedium,
+                color = Chalk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            badgeIcon(equipped.badgeId)?.let { icon ->
+                Spacer(Modifier.width(Space.sm))
+                Icon(icon, contentDescription = "Your badge", tint = Chalk, modifier = Modifier.size(28.dp))
+            }
+        }
         Spacer(Modifier.height(Space.lg))
 
         ErrorBanner(state.error)
@@ -211,6 +233,35 @@ fun HomeScreen(
             }
         }
 
+        Spacer(Modifier.height(Space.xl))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SectionHeader("Quests", Modifier.weight(1f))
+            CoinPill(quests.balance)
+        }
+        IronCard(onClick = onOpenQuests) {
+            Column {
+                val claimable = quests.quests.count { it.isClaimable }
+                val inProgress = quests.quests.count { !it.isClaimed && !it.isComplete }
+                Text(
+                    when {
+                        claimable == 1 -> "1 reward waiting"
+                        claimable > 1 -> "$claimable rewards waiting"
+                        else -> "No rewards waiting"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (claimable > 0) PrGold else Chalk
+                )
+                Caption(
+                    if (claimable > 0) "Claim them, then spend the coins in the store."
+                    else "$inProgress quest(s) still in progress. Coins come from training, not from tapping."
+                )
+            }
+        }
+
         if (state.recovery.isNotEmpty()) {
             Spacer(Modifier.height(Space.xl))
             SectionHeader("Recovery")
@@ -249,6 +300,15 @@ fun HomeScreen(
                     )
                     Caption("Track the share of it you have reached, read straight from your logged sets.")
                 }
+            }
+        }
+
+        if (equipped.widgetIds.contains("widget_plates") || equipped.widgetIds.contains("widget_1rm")) {
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Your widgets")
+            Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                if (equipped.widgetIds.contains("widget_plates")) PlateCalculatorWidget(state.unit)
+                if (equipped.widgetIds.contains("widget_1rm")) OneRepMaxWidget(state.unit)
             }
         }
 
@@ -479,4 +539,113 @@ private fun GoalSummaryRow(goal: GoalCard, unit: UnitSystem) {
         Spacer(Modifier.height(Space.xs))
         Caption("${unit.formatWeight(goal.currentKg)} of ${unit.formatWeight(goal.targetKg)} · ${goal.metric.shortLabel}")
     }
+}
+
+/**
+ * Bought widget: what goes on each side of the bar.
+ *
+ * Convenience only. The same maths is already reachable from inside a workout;
+ * this saves opening one. Nothing needed to log a set is behind the price.
+ */
+@Composable
+private fun PlateCalculatorWidget(unit: UnitSystem) {
+    var target by rememberSaveable { mutableStateOf("") }
+    var bar by rememberSaveable { mutableStateOf(if (unit == UnitSystem.METRIC) "20" else "45") }
+
+    IronCard {
+        Column {
+            Text("Plate calculator", style = MaterialTheme.typography.titleMedium, color = Chalk)
+            Spacer(Modifier.height(Space.md))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                IronTextField(
+                    value = target,
+                    onValueChange = { target = it },
+                    label = "Target (${unit.weightSuffix})",
+                    keyboardType = KeyboardType.Decimal,
+                    modifier = Modifier.weight(1f)
+                )
+                IronTextField(
+                    value = bar,
+                    onValueChange = { bar = it },
+                    label = "Bar (${unit.weightSuffix})",
+                    keyboardType = KeyboardType.Decimal,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            val targetKg = target.toDisplayKg(unit)
+            val barKg = bar.toDisplayKg(unit)
+            if (targetKg != null && barKg != null) {
+                val loading = TrainingMath.platesPerSide(targetKg, barKg)
+                Spacer(Modifier.height(Space.md))
+                if (loading.plates.isEmpty()) {
+                    Caption("That is the bar on its own.")
+                } else {
+                    Text(
+                        loading.plates.joinToString(" · ") { unit.weightValue(it) },
+                        style = NumericType.setCell,
+                        color = Chalk
+                    )
+                    Caption(
+                        if (loading.isExact) "Each side"
+                        else "Each side · closest is ${unit.formatWeight(loading.achievableTotalKg)}"
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Bought widget: a one-rep max estimate from a weight and a rep count.
+ *
+ * Uses the same Epley formula and the same reliability cut-off as the rest of
+ * the app, so the number here cannot disagree with the one on an exercise.
+ */
+@Composable
+private fun OneRepMaxWidget(unit: UnitSystem) {
+    var weight by rememberSaveable { mutableStateOf("") }
+    var reps by rememberSaveable { mutableStateOf("") }
+
+    IronCard {
+        Column {
+            Text("1RM estimator", style = MaterialTheme.typography.titleMedium, color = Chalk)
+            Spacer(Modifier.height(Space.md))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                IronTextField(
+                    value = weight,
+                    onValueChange = { weight = it },
+                    label = "Weight (${unit.weightSuffix})",
+                    keyboardType = KeyboardType.Decimal,
+                    modifier = Modifier.weight(1f)
+                )
+                IronTextField(
+                    value = reps,
+                    onValueChange = { reps = it },
+                    label = "Reps",
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            val weightKg = weight.toDisplayKg(unit)
+            val repCount = reps.trim().toIntOrNull()
+            if (weightKg != null && repCount != null && repCount > 0) {
+                val estimate = TrainingMath.estimatedOneRepMax(weightKg, repCount)
+                Spacer(Modifier.height(Space.md))
+                Text(unit.formatWeight(estimate), style = NumericType.stat, color = Chalk)
+                Caption(
+                    if (TrainingMath.isReliableEstimate(repCount)) "Estimated one-rep max"
+                    else "Rough only — the formula loses accuracy past ${TrainingMath.MAX_RELIABLE_REPS} reps"
+                )
+            }
+        }
+    }
+}
+
+/** Reads a typed figure in the display unit and returns kilograms. */
+private fun String.toDisplayKg(unit: UnitSystem): Double? {
+    val entered = trim().replace(',', '.').toDoubleOrNull() ?: return null
+    if (entered <= 0) return null
+    return if (unit == UnitSystem.METRIC) entered else TrainingMath.lbToKg(entered)
 }

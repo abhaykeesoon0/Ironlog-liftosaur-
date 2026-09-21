@@ -8,6 +8,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
@@ -50,7 +51,7 @@ private val IronShapes = Shapes(
     extraLarge = RoundedCornerShape(Radius.sheet)
 )
 
-private val IronColors = darkColorScheme(
+private fun ironColors(background: Color) = darkColorScheme(
     primary = Chalk,
     onPrimary = Slate900,
     primaryContainer = Slate700,
@@ -64,10 +65,10 @@ private val IronColors = darkColorScheme(
     tertiary = PrGold,
     onTertiary = Slate900,
 
-    background = Slate900,
+    background = background,
     onBackground = Chalk,
 
-    surface = Slate900,
+    surface = background,
     onSurface = Chalk,
     surfaceVariant = Slate800,
     onSurfaceVariant = ChalkDim,
@@ -93,6 +94,9 @@ fun IronLogTheme(
     // The app is dark-only by design: it is used in gyms, often at night, and a
     // light variant would halve the contrast of the chart palette.
     @Suppress("UNUSED_PARAMETER") darkTheme: Boolean = isSystemInDarkTheme(),
+    // A background bought from the store. Every option is dark, so this changes
+    // the shade without reopening the dark-only decision.
+    background: Color = Slate900,
     content: @Composable () -> Unit
 ) {
     val view = LocalView.current
@@ -109,7 +113,7 @@ fun IronLogTheme(
     }
 
     MaterialTheme(
-        colorScheme = IronColors,
+        colorScheme = ironColors(background),
         typography = IronTypography,
         shapes = IronShapes,
         content = content
