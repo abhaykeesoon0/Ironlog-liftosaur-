@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -51,6 +52,13 @@ import com.ironlog.app.ui.components.IronTextField
 import com.ironlog.app.ui.components.IronTopBar
 import com.ironlog.app.ui.components.LoadingBlock
 import com.ironlog.app.ui.components.PrimaryButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.height
+import com.ironlog.app.domain.usecase.MovementPattern
+import com.ironlog.app.ui.components.MovementAnimation
+import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Chalk
 import com.ironlog.app.ui.theme.ChalkDim
 import com.ironlog.app.ui.theme.ChalkFaint
@@ -71,6 +79,9 @@ fun ExerciseLibraryScreen(
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     val exercises by viewModel.exercises.collectAsStateWithLifecycle()
     val create by viewModel.create.collectAsStateWithLifecycle()
+
+    /** The exercise whose movement is being shown, if any. */
+    var demo by remember { mutableStateOf<ExerciseEntity?>(null) }
 
     Column(Modifier.fillMaxSize().imePadding()) {
         IronTopBar(
@@ -119,6 +130,7 @@ fun ExerciseLibraryScreen(
                             exercise = exercise,
                             pickMode = pickMode,
                             isSelected = exercise.id in selected,
+                            onPlay = { demo = exercise },
                             onClick = {
                                 if (pickMode) viewModel.toggle(exercise.id) else onOpenExercise(exercise.id)
                             }
@@ -154,6 +166,44 @@ fun ExerciseLibraryScreen(
             onDismiss = viewModel::dismissCreate
         )
     }
+
+    demo?.let { exercise ->
+        MovementDemoDialog(exercise = exercise, onDismiss = { demo = null })
+    }
+}
+
+/**
+ * The movement behind an exercise, as an animated figure.
+ *
+ * Shown from the library so a lifter can tell what "Jefferson Squat" is before
+ * committing it to a workout, rather than after.
+ */
+@Composable
+private fun MovementDemoDialog(exercise: ExerciseEntity, onDismiss: () -> Unit) {
+    val pattern = remember(exercise.id) {
+        MovementPattern.of(exercise.name, exercise.primaryMuscle, exercise.category)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(exercise.name, color = Chalk) },
+        text = {
+            Column {
+                MovementAnimation(pattern)
+                if (exercise.instructions.isNotBlank()) {
+                    Spacer(Modifier.height(Space.md))
+                    Text(
+                        exercise.instructions,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ChalkDim
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done", color = Chalk) }
+        },
+        containerColor = Slate700
+    )
 }
 
 @Composable
@@ -161,6 +211,7 @@ private fun ExerciseRow(
     exercise: ExerciseEntity,
     pickMode: Boolean,
     isSelected: Boolean,
+    onPlay: () -> Unit,
     onClick: () -> Unit
 ) {
     Row(
@@ -186,6 +237,16 @@ private fun ExerciseRow(
                     append(exercise.category.label)
                     if (exercise.isCustom) append(" · Custom")
                 }
+            )
+        }
+        // Its own button rather than part of the row: in pick mode the row
+        // selects the exercise, and watching the movement must not also add it
+        // to the workout.
+        IconButton(onClick = onPlay) {
+            Icon(
+                Icons.Default.PlayCircleOutline,
+                contentDescription = "Show the ${exercise.name} movement",
+                tint = ChalkDim
             )
         }
         if (pickMode) {
