@@ -8,6 +8,7 @@ import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.repository.BodyRepository
 import com.ironlog.app.data.repository.CardioRepository
+import com.ironlog.app.data.repository.EquipmentSettings
 import com.ironlog.app.data.repository.StrengthGoalRepository
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.WorkoutRepository
@@ -48,6 +49,7 @@ data class HomeUiState(
     val recentBlock: TrainingMath.BlockSummary = TrainingMath.BlockSummary(),
     val bodyweight: List<BodyweightPoint> = emptyList(),
     val recovery: List<Recovery.MuscleState> = emptyList(),
+    val equipment: EquipmentSettings = EquipmentSettings(),
     val recentRecords: List<RecordWithExercise> = emptyList(),
     val error: String? = null
 )
@@ -148,6 +150,12 @@ class HomeViewModel @Inject constructor(
                         .sortedBy { it.takenAt }
                     _state.update { it.copy(bodyweight = points) }
                 }
+        }
+
+        viewModelScope.launch {
+            profileRepository.equipment
+                .catch { e -> _state.update { it.copy(error = e.userMessage("Could not load your equipment settings")) } }
+                .collect { equipment -> _state.update { it.copy(equipment = equipment) } }
         }
 
         viewModelScope.launch {

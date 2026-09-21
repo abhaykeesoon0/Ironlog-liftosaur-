@@ -332,11 +332,14 @@ fun ActiveWorkoutScreen(
     plateTarget?.let { block ->
         PlateCalculatorSheet(
             exerciseName = block.item.exercise.name,
-            barWeightKg = block.item.exercise.defaultBarWeightKg ?: 20.0,
+            // The exercise's own bar wins where it has one -- a trap bar is not
+            // the gym's default -- and otherwise the bar from Settings is used.
+            barWeightKg = block.item.exercise.defaultBarWeightKg ?: state.equipment.barWeightKg,
             initialTargetKg = block.sets.firstOrNull { !it.isCompleted }?.weightKg
                 ?: block.sets.lastOrNull { it.weightKg != null }?.weightKg
                 ?: block.previous.firstOrNull()?.weightKg,
             unit = state.unit,
+            plateSet = state.equipment.plateSet,
             onDismiss = { plateTarget = null }
         )
     }

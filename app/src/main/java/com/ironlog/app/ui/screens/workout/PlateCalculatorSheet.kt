@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.ironlog.app.data.entity.PlateSet
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.domain.usecase.TrainingMath
 import com.ironlog.app.ui.components.Caption
@@ -67,6 +68,7 @@ internal fun PlateCalculatorSheet(
     barWeightKg: Double,
     initialTargetKg: Double?,
     unit: UnitSystem,
+    plateSet: PlateSet,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -98,17 +100,17 @@ internal fun PlateCalculatorSheet(
                 targetKg == null -> Caption("Enter the total weight you want on the bar.")
                 targetKg < barWeightKg -> Caption("That's less than the bar itself (${unit.formatWeight(barWeightKg)}).")
                 else -> {
-                    val loading = TrainingMath.platesPerSide(targetKg, barWeightKg)
+                    val loading = TrainingMath.platesPerSide(targetKg, barWeightKg, TrainingMath.platesFor(plateSet))
                     Text("Each side", style = MaterialTheme.typography.labelMedium, color = ChalkDim)
                     Spacer(Modifier.height(Space.sm))
                     if (loading.plates.isEmpty()) {
                         Caption("Just the bar.")
                     } else {
-                        PlateStack(loading.plates)
+                        PlateStack(loading.plates, plateSet)
                         Spacer(Modifier.height(Space.sm))
                         Text(
                             loading.plates.groupBy { it }.entries.joinToString("  ·  ") { (plate, list) ->
-                                "${list.size} × ${plate.trimmed()} kg"
+                                "${list.size} × ${TrainingMath.plateLabel(plateSet, plate)}"
                             },
                             style = NumericType.small,
                             color = Chalk
@@ -127,7 +129,7 @@ internal fun PlateCalculatorSheet(
                             style = NumericType.stat,
                             color = Warning
                         )
-                        Caption("${unit.formatWeight(loading.remainderKg * 2)} can't be made with standard plates.")
+                        Caption("${unit.formatWeight(loading.remainderKg * 2)} can't be made with the plates you have.")
                     }
                 }
             }
@@ -136,8 +138,8 @@ internal fun PlateCalculatorSheet(
 }
 
 @Composable
-private fun PlateStack(plates: List<Double>) {
-    val description = plates.joinToString { "${it.trimmed()} kilogram" }
+private fun PlateStack(plates: List<Double>, plateSet: PlateSet) {
+    val description = plates.joinToString { TrainingMath.plateLabel(plateSet, it) }
     Row(
         modifier = Modifier
             .fillMaxWidth()

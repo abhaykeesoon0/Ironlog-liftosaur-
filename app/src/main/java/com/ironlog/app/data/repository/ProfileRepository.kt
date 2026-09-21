@@ -5,7 +5,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ironlog.app.core.media.PhotoStore
 import com.ironlog.app.core.notifications.ReminderScheduler
 import com.ironlog.app.core.security.PasswordHasher
@@ -14,6 +16,8 @@ import com.ironlog.app.core.security.wipe
 import com.ironlog.app.data.dao.BodyDao
 import com.ironlog.app.data.dao.ExerciseDao
 import com.ironlog.app.data.dao.UserDao
+import com.ironlog.app.domain.usecase.TrainingMath
+import com.ironlog.app.data.entity.PlateSet
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.UserEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -33,6 +37,24 @@ data class ReminderSettings(
     val minute: Int = 0
 )
 
+/**
+ * The gym's equipment, as opposed to the user's reading preference.
+ *
+ * Kept on the device rather than the account because it describes where someone
+ * trains, and because the plate calculator has to work before any account has
+ * loaded.
+ */
+data class EquipmentSettings(
+    val plateSet: PlateSet = PlateSet.KILOGRAMS,
+    val barWeightKg: Double = 20.0
+) {
+    companion object {
+        /** A training bar, from a 5 kg technique bar to a 50 kg specialty bar. */
+        const val MIN_BAR_KG = 5.0
+        const val MAX_BAR_KG = 50.0
+    }
+}
+
 interface ProfileRepository {
     fun observeUser(): Flow<UserEntity?>
     val reminderSettings: Flow<ReminderSettings>
@@ -44,6 +66,9 @@ interface ProfileRepository {
      */
     val welcomeSoundEnabled: Flow<Boolean>
 
+    /** Which plates and bar the gym has, used by the plate calculator. */
+    val equipment: Flow<EquipmentSettings>
+
     suspend fun updateProfile(name: String, bodyweightKg: Double?, heightCm: Double?): Result<Unit>
     suspend fun setUnitSystem(unit: UnitSystem): Result<Unit>
     suspend fun setBiometricLock(enabled: Boolean): Result<Unit>
@@ -52,6 +77,8 @@ interface ProfileRepository {
     suspend fun setAvatar(path: String?): Result<Unit>
     suspend fun setReminder(settings: ReminderSettings): Result<Unit>
     suspend fun setWelcomeSound(enabled: Boolean): Result<Unit>
+    suspend fun setPlateSet(plateSet: PlateSet): Result<Unit>
+    suspend fun setBarWeight(barWeightKg: Double): Result<Unit>
 
     /** Requires the password again: deletion is irreversible and wipes every row the user owns. */
     suspend fun deleteAccount(password: CharArray): Result<Unit>
@@ -84,6 +111,18 @@ class ProfileRepositoryImpl @Inject constructor(
 
     override val welcomeSoundEnabled: Flow<Boolean> =
         dataStore.data.map { prefs -> prefs[KEY_WELCOME_SOUND] ?: true }
+
+    override val equipment: Flow<EquipmentSettings> = dataStore.data.map { prefs ->
+        val set = prefs[KEY_PLATE_SET]
+            ?.let { runCatching { PlateSet.valueOf(it) }.getOrNull() }
+            ?: PlateSet.KILOGRAMS
+        EquipmentSettings(
+            plateSet = set,
+            // Falls back to the bar that comes with the chosen set, so switching
+            // racks does not leave a 20 kg bar sitting under pound plates.
+            barWeightKg = prefs[KEY_BAR_WEIGHT] ?: TrainingMath.defaultBarKg(set)
+        )
+    }
 
     override suspend fun updateProfile(name: String, bodyweightKg: Double?, heightCm: Double?): Result<Unit> =
         updateUser { user ->
@@ -137,6 +176,28 @@ class ProfileRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setPlateSet(plateSet: PlateSet): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            dataStore.edit { prefs ->
+                prefs[KEY_PLATE_SET] = plateSet.name
+                // The bar moves with the rack: a pound gym's bar is 45 lb, and
+                // leaving the old number would quietly misreport every total.
+                prefs[KEY_BAR_WEIGHT] = TrainingMath.defaultBarKg(plateSet)
+            }
+            Unit
+        }
+    }
+
+    override suspend fun setBarWeight(barWeightKg: Double): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (barWeightKg !in EquipmentSettings.MIN_BAR_KG..EquipmentSettings.MAX_BAR_KG) {
+                throw UserFacingException("A bar weighs between 5 and 50 kg")
+            }
+            dataStore.edit { prefs -> prefs[KEY_BAR_WEIGHT] = barWeightKg }
+            Unit
+        }
+    }
+
     override suspend fun deleteAccount(password: CharArray): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             runCatching {
@@ -176,5 +237,8 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_REMINDER_HOUR = intPreferencesKey("reminder_hour")
         val KEY_REMINDER_MINUTE = intPreferencesKey("reminder_minute")
         val KEY_WELCOME_SOUND = booleanPreferencesKey("welcome_sound_enabled")
+        val KEY_PLATE_SET = stringPreferencesKey("plate_set")
+        val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")
+
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -41,7 +42,9 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ironlog.app.core.permissions.AppPermission
 import com.ironlog.app.core.permissions.rememberPermissionState
+import com.ironlog.app.data.entity.PlateSet
 import com.ironlog.app.data.entity.UnitSystem
+import com.ironlog.app.data.repository.EquipmentSettings
 import com.ironlog.app.domain.usecase.Recovery
 import com.ironlog.app.domain.usecase.TrainingMath
 import com.ironlog.app.ui.components.Caption
@@ -307,7 +310,9 @@ fun HomeScreen(
             Spacer(Modifier.height(Space.xl))
             SectionHeader("Your widgets")
             Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
-                if (equipped.widgetIds.contains("widget_plates")) PlateCalculatorWidget(state.unit)
+                if (equipped.widgetIds.contains("widget_plates")) {
+                    PlateCalculatorWidget(state.unit, state.equipment)
+                }
                 if (equipped.widgetIds.contains("widget_1rm")) OneRepMaxWidget(state.unit)
             }
         }
@@ -548,9 +553,17 @@ private fun GoalSummaryRow(goal: GoalCard, unit: UnitSystem) {
  * this saves opening one. Nothing needed to log a set is behind the price.
  */
 @Composable
-private fun PlateCalculatorWidget(unit: UnitSystem) {
+private fun PlateCalculatorWidget(unit: UnitSystem, equipment: EquipmentSettings) {
     var target by rememberSaveable { mutableStateOf("") }
-    var bar by rememberSaveable { mutableStateOf(if (unit == UnitSystem.METRIC) "20" else "45") }
+    // The bar follows Settings unless the user types over it, and is written in
+    // the plate set's own unit because that is the number stamped on the bar.
+    // Holding an override rather than seeding a field means a bar changed in
+    // Settings reaches a widget that is already on screen.
+    var barOverride by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(equipment) { barOverride = null }
+    val bar = barOverride
+        ?: TrainingMath.plateLabel(equipment.plateSet, equipment.barWeightKg).substringBefore(' ')
+    val plateUnitSuffix = if (equipment.plateSet == PlateSet.KILOGRAMS) "kg" else "lb"
 
     IronCard {
         Column {
@@ -566,23 +579,29 @@ private fun PlateCalculatorWidget(unit: UnitSystem) {
                 )
                 IronTextField(
                     value = bar,
-                    onValueChange = { bar = it },
-                    label = "Bar (${unit.weightSuffix})",
+                    onValueChange = { barOverride = it },
+                    label = "Bar ($plateUnitSuffix)",
                     keyboardType = KeyboardType.Decimal,
                     modifier = Modifier.weight(1f)
                 )
             }
 
             val targetKg = target.toDisplayKg(unit)
-            val barKg = bar.toDisplayKg(unit)
+            val barKg = bar.toPlateKg(equipment.plateSet)
             if (targetKg != null && barKg != null) {
-                val loading = TrainingMath.platesPerSide(targetKg, barKg)
+                val loading = TrainingMath.platesPerSide(
+                    targetKg,
+                    barKg,
+                    TrainingMath.platesFor(equipment.plateSet)
+                )
                 Spacer(Modifier.height(Space.md))
                 if (loading.plates.isEmpty()) {
                     Caption("That is the bar on its own.")
                 } else {
                     Text(
-                        loading.plates.joinToString(" · ") { unit.weightValue(it) },
+                        loading.plates.joinToString(" · ") {
+                            TrainingMath.plateLabel(equipment.plateSet, it)
+                        },
                         style = NumericType.setCell,
                         color = Chalk
                     )
@@ -641,6 +660,13 @@ private fun OneRepMaxWidget(unit: UnitSystem) {
             }
         }
     }
+}
+
+/** Reads a bar weight typed in the plate set's own unit and returns kilograms. */
+private fun String.toPlateKg(plateSet: PlateSet): Double? {
+    val entered = trim().replace(',', '.').toDoubleOrNull() ?: return null
+    if (entered <= 0) return null
+    return if (plateSet == PlateSet.KILOGRAMS) entered else TrainingMath.lbToKg(entered)
 }
 
 /** Reads a typed figure in the display unit and returns kilograms. */

@@ -11,7 +11,10 @@ import com.ironlog.app.data.entity.UserEntity
 import com.ironlog.app.data.repository.ExportKind
 import com.ironlog.app.data.repository.ExportRepository
 import com.ironlog.app.data.repository.ProfileRepository
+import com.ironlog.app.data.entity.PlateSet
+import com.ironlog.app.data.repository.EquipmentSettings
 import com.ironlog.app.data.repository.ReminderSettings
+import com.ironlog.app.domain.usecase.TrainingMath
 import com.ironlog.app.data.repository.userMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +49,9 @@ class SettingsViewModel @Inject constructor(
     val reminder: StateFlow<ReminderSettings> = profileRepository.reminderSettings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReminderSettings())
 
+    val equipment: StateFlow<EquipmentSettings> = profileRepository.equipment
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EquipmentSettings())
+
     val welcomeSound: StateFlow<Boolean> = profileRepository.welcomeSoundEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
@@ -71,6 +77,18 @@ class SettingsViewModel @Inject constructor(
         val u = user.value ?: return
         val next = (u.weeklyGoalWorkouts + delta).coerceIn(1, 14)
         persist("Could not update the goal") { profileRepository.setWeeklyGoal(next) }
+    }
+
+    fun setPlateSet(plateSet: PlateSet) =
+        persist("Could not change the plate set") { profileRepository.setPlateSet(plateSet) }
+
+    /** Steps the bar by the smallest plate on the chosen rack. */
+    fun changeBar(direction: Int) {
+        val current = equipment.value
+        val step = if (current.plateSet == PlateSet.KILOGRAMS) BAR_STEP_KG else TrainingMath.lbToKg(BAR_STEP_LB)
+        persist("Could not change the bar weight") {
+            profileRepository.setBarWeight(current.barWeightKg + direction * step)
+        }
     }
 
     fun setWelcomeSound(enabled: Boolean) =
@@ -158,6 +176,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     companion object {
+        /** The bar steps by the smallest plate a rack of that kind has. */
+        const val BAR_STEP_KG = 2.5
+        const val BAR_STEP_LB = 5.0
+
         const val MIN_REST = 15
         const val MAX_REST = 600
         const val REST_STEP = 15
