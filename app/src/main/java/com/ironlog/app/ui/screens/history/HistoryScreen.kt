@@ -30,12 +30,19 @@ import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.WorkoutRepository
 import com.ironlog.app.data.repository.userMessage
+import com.ironlog.app.domain.usecase.Gamification
+import com.ironlog.app.domain.usecase.TrainingMath
+import com.ironlog.app.ui.components.AchievementRow
 import com.ironlog.app.ui.components.EmptyState
 import com.ironlog.app.ui.components.ErrorBanner
+import com.ironlog.app.ui.components.HeatmapDay
 import com.ironlog.app.ui.components.IronCard
+import com.ironlog.app.ui.components.LevelCard
 import com.ironlog.app.ui.components.LoadingBlock
+import com.ironlog.app.ui.components.MonthHeatmap
 import com.ironlog.app.ui.components.ScreenTitle
 import com.ironlog.app.ui.components.StatTile
+import com.ironlog.app.ui.components.StreakCard
 import com.ironlog.app.ui.format.formatDuration
 import com.ironlog.app.ui.format.formatRelativeDay
 import com.ironlog.app.ui.format.formatTime
@@ -58,12 +65,28 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
 
-data class MonthGroup(val label: String, val workouts: List<WorkoutWithDetail>)
+/** A finished workout together with what that session earned. */
+data class HistoryEntry(
+    val detail: WorkoutWithDetail,
+    val achievements: List<Gamification.Achievement>
+)
+
+data class MonthGroup(
+    val label: String,
+    val entries: List<HistoryEntry>,
+    val days: List<HeatmapDay>,
+    /** Blank cells before the 1st, so the grid lines up under its weekday column. */
+    val firstDayOffset: Int
+)
 
 data class HistoryUiState(
     val isLoading: Boolean = true,
     val unit: UnitSystem = UnitSystem.METRIC,
     val months: List<MonthGroup> = emptyList(),
+    val level: Gamification.LevelProgress = Gamification.levelFor(0),
+    val streakWeeks: Int = 0,
+    val finishedCount: Int = 0,
+    val nextMilestone: Gamification.Milestone? = null,
     val error: String? = null
 )
 
@@ -80,17 +103,45 @@ class HistoryViewModel @Inject constructor(
         profileRepository.observeUser()
     ) { history, user ->
         val zone = ZoneId.systemDefault()
-        // History arrives newest first and groupBy keeps encounter order, so the
-        // months come out newest first without a second sort.
+
+        // Progression is derived from the same history the screen already shows,
+        // so there is no XP column to migrate and nothing that can fall out of
+        // step with the workouts themselves. The ceiling is the repository's
+        // history limit, which is far beyond what a coursework log reaches.
+        val ascending = history.map { it.workout }.asReversed()
+        val achievements = ascending.mapIndexed { index, workout ->
+            workout.id to Gamification.achievementsFor(workout, ascending.subList(0, index))
+        }.toMap()
+
         val months = history
+            // History arrives newest first and groupBy keeps encounter order, so the
+            // months come out newest first without a second sort.
             .groupBy { YearMonth.from(Instant.ofEpochMilli(it.workout.startedAt).atZone(zone)) }
             .map { (month, workouts) ->
-                MonthGroup("${monthFormat.format(month)} · ${workouts.size}", workouts)
+                val volumeByDay = workouts
+                    .groupBy { Instant.ofEpochMilli(it.workout.startedAt).atZone(zone).dayOfMonth }
+                    .mapValues { (_, dayWorkouts) -> dayWorkouts.sumOf { it.workout.totalVolumeKg } }
+                MonthGroup(
+                    label = "${monthFormat.format(month)} · ${workouts.size}",
+                    entries = workouts.map { detail ->
+                        HistoryEntry(detail, achievements[detail.workout.id].orEmpty())
+                    },
+                    days = (1..month.lengthOfMonth()).map { day ->
+                        HeatmapDay(day, volumeByDay[day] ?: 0.0)
+                    },
+                    // DayOfWeek counts Monday as 1, and the grid starts on Monday.
+                    firstDayOffset = month.atDay(1).dayOfWeek.value - 1
+                )
             }
+
         HistoryUiState(
             isLoading = false,
             unit = user?.unitSystem ?: UnitSystem.METRIC,
-            months = months
+            months = months,
+            level = Gamification.levelFor(Gamification.totalXp(ascending)),
+            streakWeeks = TrainingMath.weeklyStreak(ascending.map { it.startedAt }),
+            finishedCount = ascending.size,
+            nextMilestone = Gamification.nextMilestone(ascending.size)
         )
     }
         .catch { e -> emit(HistoryUiState(isLoading = false, error = e.userMessage("Could not load your history"))) }
@@ -121,19 +172,32 @@ fun HistoryScreen(
                     body = "Finished workouts appear here with their sets, volume and any records you set."
                 )
             }
-            else -> state.months.forEach { month ->
-                item(key = "header-${month.label}") {
-                    Text(
-                        month.label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = ChalkDim,
-                        modifier = Modifier
-                            .padding(top = Space.md)
-                            .semantics { heading() }
+            else -> {
+                item(key = "level") { LevelCard(state.level) }
+                item(key = "streak") {
+                    StreakCard(
+                        streakWeeks = state.streakWeeks,
+                        finishedCount = state.finishedCount,
+                        nextMilestone = state.nextMilestone
                     )
                 }
-                items(month.workouts, key = { it.workout.id }) { detail ->
-                    WorkoutHistoryCard(detail, state.unit) { onOpenWorkout(detail.workout.id) }
+
+                state.months.forEach { month ->
+                    item(key = "header-${month.label}") {
+                        Column(Modifier.padding(top = Space.md)) {
+                            Text(
+                                month.label,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = ChalkDim,
+                                modifier = Modifier.semantics { heading() }
+                            )
+                            Spacer(Modifier.height(Space.md))
+                            MonthHeatmap(days = month.days, firstDayOffset = month.firstDayOffset)
+                        }
+                    }
+                    items(month.entries, key = { it.detail.workout.id }) { entry ->
+                        WorkoutHistoryCard(entry, state.unit) { onOpenWorkout(entry.detail.workout.id) }
+                    }
                 }
             }
         }
@@ -142,7 +206,8 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun WorkoutHistoryCard(detail: WorkoutWithDetail, unit: UnitSystem, onClick: () -> Unit) {
+private fun WorkoutHistoryCard(entry: HistoryEntry, unit: UnitSystem, onClick: () -> Unit) {
+    val detail = entry.detail
     val w = detail.workout
     IronCard(onClick = onClick) {
         Column {
@@ -159,9 +224,18 @@ private fun WorkoutHistoryCard(detail: WorkoutWithDetail, unit: UnitSystem, onCl
                 StatTile(w.totalSets.toString(), "Sets")
                 StatTile(w.prCount.toString(), "PRs", accent = if (w.prCount > 0) PrGold else Chalk)
             }
+            if (entry.achievements.isNotEmpty()) {
+                Spacer(Modifier.height(Space.md))
+                AchievementRow(entry.achievements)
+            }
+            // Warm-ups are left out so this line adds up to the Sets tile above it.
             val names = detail.exercises
                 .sortedBy { it.workoutExercise.orderIndex }
-                .joinToString(" · ") { "${it.sets.size} × ${it.exercise.name}" }
+                .mapNotNull { exercise ->
+                    val working = TrainingMath.workingSetCount(exercise.sets)
+                    if (working > 0) "$working × ${exercise.exercise.name}" else null
+                }
+                .joinToString(" · ")
             if (names.isNotBlank()) {
                 Spacer(Modifier.height(Space.md))
                 Text(

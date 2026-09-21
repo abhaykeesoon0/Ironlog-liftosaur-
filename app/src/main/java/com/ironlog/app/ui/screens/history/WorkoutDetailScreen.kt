@@ -41,6 +41,7 @@ import com.ironlog.app.data.dao.WorkoutExerciseWithDetail
 import com.ironlog.app.data.entity.SetType
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.WorkoutSetEntity
+import com.ironlog.app.ui.components.AchievementRow
 import com.ironlog.app.ui.components.Caption
 import com.ironlog.app.ui.components.ConfirmDialog
 import com.ironlog.app.ui.components.EmptyState
@@ -152,11 +153,23 @@ fun WorkoutDetailScreen(
                 item {
                     val w = detail.workout
                     IronCard {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            StatTile(formatDuration(w.durationSeconds), "Duration")
-                            StatTile(state.unit.formatVolume(w.totalVolumeKg), "Volume")
-                            StatTile(w.totalSets.toString(), "Sets")
-                            StatTile(state.totalReps.toString(), "Reps")
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                StatTile(formatDuration(w.durationSeconds), "Duration")
+                                StatTile(state.unit.formatVolume(w.totalVolumeKg), "Volume")
+                                StatTile(w.totalSets.toString(), "Sets")
+                                StatTile(state.totalReps.toString(), "Reps")
+                            }
+                            if (state.achievements.isNotEmpty()) {
+                                Spacer(Modifier.height(Space.md))
+                                AchievementRow(state.achievements, max = state.achievements.size)
+                            }
+                            Spacer(Modifier.height(Space.md))
+                            Text(
+                                "+${state.xpEarned} XP earned",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ChalkFaint
+                            )
                         }
                     }
                 }
