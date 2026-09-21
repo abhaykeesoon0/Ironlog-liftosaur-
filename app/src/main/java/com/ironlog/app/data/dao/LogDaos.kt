@@ -8,8 +8,10 @@ import androidx.room.Upsert
 import com.ironlog.app.data.entity.BodyMeasurementEntity
 import com.ironlog.app.data.entity.CardioSessionEntity
 import com.ironlog.app.data.entity.DailyActivityEntity
+import com.ironlog.app.data.entity.GoalMetric
 import com.ironlog.app.data.entity.PersonalRecordEntity
 import com.ironlog.app.data.entity.ProgressPhotoEntity
+import com.ironlog.app.data.entity.StrengthGoalEntity
 import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.entity.WorkoutExerciseEntity
 import com.ironlog.app.data.entity.WorkoutSetEntity
@@ -288,4 +290,74 @@ interface CardioDao {
 
     @Query("SELECT * FROM daily_activity WHERE userId = :userId AND dateEpochDay >= :sinceDay ORDER BY dateEpochDay")
     fun observeActivityRange(userId: String, sinceDay: Long): Flow<List<DailyActivityEntity>>
+}
+
+@Dao
+interface StrengthGoalDao {
+
+    @Upsert suspend fun upsert(goal: StrengthGoalEntity)
+
+    @Query("DELETE FROM strength_goals WHERE id = :id") suspend fun deleteById(id: String)
+
+    @Query("SELECT * FROM strength_goals WHERE id = :id LIMIT 1")
+    suspend fun findById(id: String): StrengthGoalEntity?
+
+    @Query(
+        """
+        SELECT * FROM strength_goals
+        WHERE userId = :userId AND exerciseId = :exerciseId AND metric = :metric LIMIT 1
+        """
+    )
+    suspend fun findFor(userId: String, exerciseId: String, metric: GoalMetric): StrengthGoalEntity?
+
+    @Query(
+        """
+        SELECT g.*, e.name AS exerciseName FROM strength_goals g
+        JOIN exercises e ON e.id = g.exerciseId
+        WHERE g.userId = :userId
+        ORDER BY g.createdAt DESC
+        """
+    )
+    fun observeGoals(userId: String): Flow<List<GoalWithExercise>>
+
+    /**
+     * Every completed set on one exercise, newest workout last, for working out
+     * where a goal stands. Sets rather than a pre-aggregated row: an estimated
+     * 1RM has to come from the weight and reps of the *same* set, and a query
+     * that takes the heaviest weight and the highest reps separately would
+     * combine two different sets into a lift that never happened.
+     */
+    @Query(
+        """
+        SELECT s.*, w.id AS workoutId, w.startedAt AS startedAt FROM workout_sets s
+        JOIN workout_exercises we ON we.id = s.workoutExerciseId
+        JOIN workouts w ON w.id = we.workoutId
+        WHERE w.userId = :userId AND we.exerciseId = :exerciseId
+          AND w.finishedAt IS NOT NULL AND s.isCompleted = 1
+        ORDER BY w.startedAt ASC
+        """
+    )
+    fun observeCompletedSets(userId: String, exerciseId: String): Flow<List<HistoricSet>>
+
+    /**
+     * Working volume per muscle per session, for the recovery readout. Grouped
+     * by workout so each session contributes one row per muscle it worked.
+     */
+    @Query(
+        """
+        SELECT e.primaryMuscle AS muscle,
+               w.startedAt AS trainedAt,
+               COALESCE(SUM(CASE WHEN s.type != 'WARMUP'
+                    THEN COALESCE(s.weightKg, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0) AS volume
+        FROM workout_sets s
+        JOIN workout_exercises we ON we.id = s.workoutExerciseId
+        JOIN workouts w ON w.id = we.workoutId
+        JOIN exercises e ON e.id = we.exerciseId
+        WHERE w.userId = :userId AND w.finishedAt IS NOT NULL
+          AND s.isCompleted = 1 AND w.startedAt >= :since
+        GROUP BY w.id, e.primaryMuscle
+        ORDER BY w.startedAt DESC
+        """
+    )
+    fun observeMuscleSessions(userId: String, since: Long): Flow<List<MuscleSessionRow>>
 }

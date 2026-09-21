@@ -224,3 +224,45 @@ data class DailyActivityEntity(
     val sensorBaseline: Float? = null,
     val updatedAt: Long = 0L
 )
+
+/**
+ * A strength target on one exercise: "squat 180 kg".
+ *
+ * The goal stores only the target. Progress is worked out from the training
+ * log whenever it is shown, so a goal can never disagree with the sets behind
+ * it, and editing or deleting a workout moves the goal with it.
+ */
+@Entity(
+    tableName = "strength_goals",
+    foreignKeys = [
+        ForeignKey(
+            entity = UserEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["userId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = ExerciseEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["exerciseId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        // One goal per exercise per metric: two targets on the same measure
+        // would just be the harder one with a distraction beside it.
+        Index(value = ["userId", "exerciseId", "metric"], unique = true),
+        Index(value = ["exerciseId"])
+    ]
+)
+data class StrengthGoalEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val exerciseId: String,
+    val metric: GoalMetric,
+    /** Stored in kilograms, like every other weight in the app. */
+    val targetKg: Double,
+    val createdAt: Long,
+    /** Set the first time the target is met, so a reached goal stays reached. */
+    val achievedAt: Long? = null
+)

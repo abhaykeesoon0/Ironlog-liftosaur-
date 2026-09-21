@@ -41,6 +41,18 @@ enum class MuscleGroup(val label: String) {
     CARDIO("Cardio")
 }
 
+/**
+ * What a strength goal is measured on.
+ *
+ * Two metrics rather than one because they answer different questions: an
+ * estimate counts progress made at any rep range, while a top weight is the
+ * number a lifter can claim to have actually put on the bar.
+ */
+enum class GoalMetric(val label: String, val shortLabel: String) {
+    ESTIMATED_1RM("Estimated 1RM", "1RM"),
+    TOP_WEIGHT("Top weight", "Weight")
+}
+
 enum class SetType(val label: String, val shortLabel: String) {
     WARMUP("Warm-up", "W"),
     NORMAL("Working", ""),

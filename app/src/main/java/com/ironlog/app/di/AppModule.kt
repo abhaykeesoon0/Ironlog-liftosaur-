@@ -2,6 +2,8 @@ package com.ironlog.app.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ironlog.app.core.database.AppDatabase
 import com.ironlog.app.core.security.KeystoreSigningSecretProvider
 import com.ironlog.app.core.security.SigningSecretProvider
@@ -10,6 +12,7 @@ import com.ironlog.app.data.dao.CardioDao
 import com.ironlog.app.data.dao.ExerciseDao
 import com.ironlog.app.data.dao.PersonalRecordDao
 import com.ironlog.app.data.dao.RoutineDao
+import com.ironlog.app.data.dao.StrengthGoalDao
 import com.ironlog.app.data.dao.UserDao
 import com.ironlog.app.data.dao.WorkoutDao
 import androidx.datastore.core.DataStore
@@ -20,6 +23,8 @@ import com.ironlog.app.data.repository.AuthRepository
 import com.ironlog.app.data.repository.AuthRepositoryImpl
 import com.ironlog.app.data.repository.BodyRepository
 import com.ironlog.app.data.repository.BodyRepositoryImpl
+import com.ironlog.app.data.repository.StrengthGoalRepository
+import com.ironlog.app.data.repository.StrengthGoalRepositoryImpl
 import com.ironlog.app.data.repository.CardioRepository
 import com.ironlog.app.data.repository.CardioRepositoryImpl
 import com.ironlog.app.data.repository.ExerciseRepository
@@ -64,7 +69,52 @@ object DatabaseModule {
             // No destructive fallback: silently wiping a user's training history
             // on a schema change would be a data-loss bug, not a convenience.
             // Migrations are added explicitly when the schema moves.
+            .addMigrations(MIGRATION_1_2)
             .build()
+
+    /**
+     * Adds the strength_goals table. Purely additive, so no existing row is
+     * touched and an upgrade cannot lose training history.
+     *
+     * The column types and index names have to match what Room generates for
+     * [com.ironlog.app.data.entity.StrengthGoalEntity] exactly, or Room's
+     * identity check fails at open time on an upgraded install.
+     */
+    val MIGRATION_1_2 = object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `strength_goals` (
+                    `id` TEXT NOT NULL,
+                    `userId` TEXT NOT NULL,
+                    `exerciseId` TEXT NOT NULL,
+                    `metric` TEXT NOT NULL,
+                    `targetKg` REAL NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `achievedAt` INTEGER,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`userId`) REFERENCES `users`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`exerciseId`) REFERENCES `exercises`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                `index_strength_goals_userId_exerciseId_metric`
+                ON `strength_goals` (`userId`, `exerciseId`, `metric`)
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_strength_goals_exerciseId`
+                ON `strength_goals` (`exerciseId`)
+                """.trimIndent()
+            )
+        }
+    }
 
     @Provides fun provideUserDao(db: AppDatabase): UserDao = db.userDao()
     @Provides fun provideExerciseDao(db: AppDatabase): ExerciseDao = db.exerciseDao()
@@ -73,6 +123,7 @@ object DatabaseModule {
     @Provides fun providePersonalRecordDao(db: AppDatabase): PersonalRecordDao = db.personalRecordDao()
     @Provides fun provideBodyDao(db: AppDatabase): BodyDao = db.bodyDao()
     @Provides fun provideCardioDao(db: AppDatabase): CardioDao = db.cardioDao()
+    @Provides fun provideStrengthGoalDao(db: AppDatabase): StrengthGoalDao = db.strengthGoalDao()
 
     /** Non-sensitive preferences only; session secrets live in SecureTokenStore. */
     @Provides
@@ -120,6 +171,9 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindBodyRepository(impl: BodyRepositoryImpl): BodyRepository
+
+    @Binds @Singleton
+    abstract fun bindStrengthGoalRepository(impl: StrengthGoalRepositoryImpl): StrengthGoalRepository
 
     @Binds @Singleton
     abstract fun bindCardioRepository(impl: CardioRepositoryImpl): CardioRepository

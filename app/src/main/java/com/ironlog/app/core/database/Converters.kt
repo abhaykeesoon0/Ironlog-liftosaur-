@@ -3,6 +3,7 @@ package com.ironlog.app.core.database
 import androidx.room.TypeConverter
 import com.ironlog.app.data.entity.CardioType
 import com.ironlog.app.data.entity.ExerciseCategory
+import com.ironlog.app.data.entity.GoalMetric
 import com.ironlog.app.data.entity.MuscleGroup
 import com.ironlog.app.data.entity.PhotoPose
 import com.ironlog.app.data.entity.RecordType
@@ -21,6 +22,10 @@ class Converters {
     @TypeConverter fun categoryToString(v: ExerciseCategory?): String? = v?.name
     @TypeConverter fun stringToCategory(v: String?): ExerciseCategory? =
         v?.let { runCatching { ExerciseCategory.valueOf(it) }.getOrNull() }
+
+    @TypeConverter fun goalMetricToString(v: GoalMetric?): String? = v?.name
+    @TypeConverter fun stringToGoalMetric(v: String?): GoalMetric? =
+        v?.let { runCatching { GoalMetric.valueOf(it) }.getOrNull() }
 
     @TypeConverter fun setTypeToString(v: SetType?): String? = v?.name
     @TypeConverter fun stringToSetType(v: String?): SetType? =
