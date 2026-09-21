@@ -1,6 +1,7 @@
 package com.ironlog.app.domain.usecase
 
 import com.ironlog.app.data.entity.SetType
+import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.entity.WorkoutSetEntity
 import java.time.Instant
 import java.time.LocalDate
@@ -151,6 +152,34 @@ object TrainingMath {
             cursor = cursor.minusWeeks(1)
         }
         return streak
+    }
+
+    /**
+     * Totals across a block of finished workouts, for the Home summary.
+     *
+     * [averageDurationSeconds] divides by the number of sessions actually in the
+     * block, not by the window asked for: with four workouts logged, the average
+     * is over those four, otherwise a new user's average would read as a quarter
+     * of what they really trained.
+     */
+    data class BlockSummary(
+        val workouts: Int = 0,
+        val totalVolumeKg: Double = 0.0,
+        val totalDurationSeconds: Int = 0,
+        val averageDurationSeconds: Int = 0,
+        val recordsBroken: Int = 0
+    )
+
+    fun summarise(workouts: List<WorkoutEntity>): BlockSummary {
+        if (workouts.isEmpty()) return BlockSummary()
+        val totalDuration = workouts.sumOf { it.durationSeconds }
+        return BlockSummary(
+            workouts = workouts.size,
+            totalVolumeKg = workouts.sumOf { it.totalVolumeKg },
+            totalDurationSeconds = totalDuration,
+            averageDurationSeconds = totalDuration / workouts.size,
+            recordsBroken = workouts.sumOf { it.prCount }
+        )
     }
 
     /** Rounds to the nearest achievable increment so the UI never shows 47.3 kg. */

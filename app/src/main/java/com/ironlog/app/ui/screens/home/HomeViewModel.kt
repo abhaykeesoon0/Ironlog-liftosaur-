@@ -6,6 +6,7 @@ import com.ironlog.app.core.sensors.StepCounter
 import com.ironlog.app.data.dao.RecordWithExercise
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.WorkoutEntity
+import com.ironlog.app.data.repository.BodyRepository
 import com.ironlog.app.data.repository.CardioRepository
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.WorkoutRepository
@@ -27,6 +28,9 @@ import javax.inject.Inject
 
 data class ActiveWorkoutInfo(val id: String, val name: String, val startedAt: Long, val completedSets: Int)
 
+/** One weigh-in, oldest first, for the bodyweight line on Home. */
+data class BodyweightPoint(val takenAt: Long, val weightKg: Double)
+
 data class HomeUiState(
     val displayName: String = "",
     val greeting: String = "",
@@ -39,6 +43,8 @@ data class HomeUiState(
     val stepSensorAvailable: Boolean = false,
     val todaySteps: Int = 0,
     val lastWorkout: WorkoutEntity? = null,
+    val recentBlock: TrainingMath.BlockSummary = TrainingMath.BlockSummary(),
+    val bodyweight: List<BodyweightPoint> = emptyList(),
     val recentRecords: List<RecordWithExercise> = emptyList(),
     val error: String? = null
 )
@@ -48,6 +54,7 @@ class HomeViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
     private val profileRepository: ProfileRepository,
     private val cardioRepository: CardioRepository,
+    private val bodyRepository: BodyRepository,
     private val stepCounter: StepCounter
 ) : ViewModel() {
 
@@ -101,7 +108,7 @@ class HomeViewModel @Inject constructor(
                 workoutRepository.observeWorkoutCountSince(weekStart),
                 workoutRepository.observeVolumeSince(weekStart),
                 workoutRepository.observeWorkoutDates(),
-                workoutRepository.observeHistory(1),
+                workoutRepository.observeHistory(RECENT_WINDOW),
                 workoutRepository.observeRecentRecords(3)
             ) { count, volume, dates, history, records ->
                 _state.value.copy(
@@ -109,6 +116,7 @@ class HomeViewModel @Inject constructor(
                     volumeThisWeekKg = volume,
                     streakWeeks = TrainingMath.weeklyStreak(dates),
                     lastWorkout = history.firstOrNull()?.workout,
+                    recentBlock = TrainingMath.summarise(history.map { detail -> detail.workout }),
                     recentRecords = records
                 )
             }
@@ -120,9 +128,21 @@ class HomeViewModel @Inject constructor(
                             volumeThisWeekKg = next.volumeThisWeekKg,
                             streakWeeks = next.streakWeeks,
                             lastWorkout = next.lastWorkout,
+                            recentBlock = next.recentBlock,
                             recentRecords = next.recentRecords
                         )
                     }
+                }
+        }
+
+        viewModelScope.launch {
+            bodyRepository.observeMeasurements()
+                .catch { e -> _state.update { it.copy(error = e.userMessage("Could not load your bodyweight history")) } }
+                .collect { measurements ->
+                    val points = measurements
+                        .mapNotNull { m -> m.weightKg?.let { BodyweightPoint(m.takenAt, it) } }
+                        .sortedBy { it.takenAt }
+                    _state.update { it.copy(bodyweight = points) }
                 }
         }
 
@@ -163,8 +183,16 @@ class HomeViewModel @Inject constructor(
         return monday.atStartOfDay(zone).toInstant().toEpochMilli()
     }
 
-    private companion object {
-        fun greetingForNow(): String = when (LocalTime.now().hour) {
+    companion object {
+        /**
+         * How many recent sessions the Home summary covers. Two weeks of
+         * training for most people, which is long enough to smooth out a single
+         * heavy or missed day without reaching back into a different training
+         * block.
+         */
+        const val RECENT_WINDOW = 14
+
+        private fun greetingForNow(): String = when (LocalTime.now().hour) {
             in 5..11 -> "Good morning"
             in 12..17 -> "Good afternoon"
             else -> "Good evening"

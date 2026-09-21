@@ -180,7 +180,8 @@ fun MainNavHost(
                     onOpenActiveWorkout = { navController.navigate(Routes.ACTIVE_WORKOUT) },
                     onOpenRoutines = { navController.navigateToTab(Routes.ROUTINES) },
                     onOpenCardio = { navController.navigate(Routes.CARDIO) },
-                    onOpenWorkout = { navController.navigate(Routes.workoutDetail(it)) }
+                    onOpenWorkout = { navController.navigate(Routes.workoutDetail(it)) },
+                    onOpenBody = { navController.navigate(Routes.BODY) }
                 )
             }
             composable(Routes.ROUTINES) {

@@ -1,6 +1,7 @@
 package com.ironlog.app.domain
 
 import com.ironlog.app.data.entity.SetType
+import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.entity.WorkoutSetEntity
 import com.ironlog.app.domain.usecase.TrainingMath
 import org.junit.Assert.assertEquals
@@ -12,6 +13,11 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class TrainingMathTest {
+
+    private fun workout(volume: Double, duration: Int, prs: Int) = WorkoutEntity(
+        id = "w", userId = "u", name = "Session", startedAt = 0L, finishedAt = 1L,
+        totalVolumeKg = volume, durationSeconds = duration, prCount = prs
+    )
 
     private fun set(weight: Double?, reps: Int?, type: SetType = SetType.NORMAL, done: Boolean = true) =
         WorkoutSetEntity(
@@ -87,6 +93,31 @@ class TrainingMathTest {
         assertEquals(1, TrainingMath.weeklyStreak(
             listOf(millis(today), millis(today.minusWeeks(2))), zone
         ))
+    }
+
+    @Test
+    fun `a block of workouts totals volume, time and records`() {
+        val block = TrainingMath.summarise(
+            listOf(
+                workout(volume = 1000.0, duration = 3600, prs = 2),
+                workout(volume = 1500.0, duration = 2700, prs = 0),
+                workout(volume = 500.0, duration = 1800, prs = 1)
+            )
+        )
+        assertEquals(3, block.workouts)
+        assertEquals(3000.0, block.totalVolumeKg, 1e-9)
+        assertEquals(8100, block.totalDurationSeconds)
+        // Averaged over the three logged, not over the window asked for.
+        assertEquals(2700, block.averageDurationSeconds)
+        assertEquals(3, block.recordsBroken)
+    }
+
+    @Test
+    fun `an empty block is all zeroes rather than a divide by zero`() {
+        val block = TrainingMath.summarise(emptyList())
+        assertEquals(0, block.workouts)
+        assertEquals(0, block.averageDurationSeconds)
+        assertEquals(0.0, block.totalVolumeKg, 1e-9)
     }
 
     @Test

@@ -38,8 +38,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ironlog.app.core.permissions.AppPermission
 import com.ironlog.app.core.permissions.rememberPermissionState
 import com.ironlog.app.ui.components.Caption
+import com.ironlog.app.ui.components.ChartPoint
 import com.ironlog.app.ui.components.ErrorBanner
 import com.ironlog.app.ui.components.IronCard
+import com.ironlog.app.ui.components.LineChart
 import com.ironlog.app.ui.components.PrBadge
 import com.ironlog.app.ui.components.PrimaryButton
 import com.ironlog.app.ui.components.SecondaryButton
@@ -48,7 +50,10 @@ import com.ironlog.app.ui.components.StatTile
 import com.ironlog.app.ui.format.formatClock
 import com.ironlog.app.ui.format.formatDuration
 import com.ironlog.app.ui.format.formatRelativeDay
+import com.ironlog.app.ui.format.formatShortDate
 import com.ironlog.app.ui.format.formatVolume
+import com.ironlog.app.ui.format.trimmed
+import com.ironlog.app.ui.format.weightValue
 import com.ironlog.app.ui.screens.exercises.formatRecordContext
 import com.ironlog.app.ui.screens.exercises.formatRecordValue
 import com.ironlog.app.ui.theme.Chalk
@@ -56,6 +61,7 @@ import com.ironlog.app.ui.theme.ChalkDim
 import com.ironlog.app.ui.theme.ChalkFaint
 import com.ironlog.app.ui.theme.NumericType
 import com.ironlog.app.ui.theme.Plate10
+import com.ironlog.app.ui.theme.Plate20
 import com.ironlog.app.ui.theme.PrGold
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Space
@@ -67,6 +73,7 @@ fun HomeScreen(
     onOpenRoutines: () -> Unit,
     onOpenCardio: () -> Unit,
     onOpenWorkout: (String) -> Unit,
+    onOpenBody: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -193,6 +200,52 @@ fun HomeScreen(
                     Caption("Record a run, walk or ride with GPS")
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
+            }
+        }
+
+        val recent = state.recentBlock
+        if (recent.workouts > 0) {
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Last ${recent.workouts} workouts")
+            IronCard {
+                Column {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        StatTile(state.unit.formatVolume(recent.totalVolumeKg), "Total volume")
+                        StatTile(formatDuration(recent.totalDurationSeconds), "Total time")
+                    }
+                    Spacer(Modifier.height(Space.lg))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        StatTile(formatDuration(recent.averageDurationSeconds), "Average session")
+                        StatTile(
+                            recent.recordsBroken.toString(),
+                            "Records broken",
+                            accent = if (recent.recordsBroken > 0) PrGold else Chalk
+                        )
+                    }
+                    if (recent.workouts < HomeViewModel.RECENT_WINDOW) {
+                        Spacer(Modifier.height(Space.md))
+                        Caption("Everything you have logged so far, up to your last ${HomeViewModel.RECENT_WINDOW} sessions.")
+                    }
+                }
+            }
+        }
+
+        val bodyweight = state.bodyweight
+        if (bodyweight.size >= 2) {
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Bodyweight")
+            IronCard(onClick = onOpenBody) {
+                LineChart(
+                    points = bodyweight.map { point ->
+                        ChartPoint(
+                            formatShortDate(point.takenAt),
+                            state.unit.weightValue(point.weightKg).toFloatOrNull() ?: 0f
+                        )
+                    },
+                    color = Plate20,
+                    valueFormatter = { "${it.toDouble().trimmed(1)} ${state.unit.weightSuffix}" },
+                    description = "Bodyweight over time"
+                )
             }
         }
 
