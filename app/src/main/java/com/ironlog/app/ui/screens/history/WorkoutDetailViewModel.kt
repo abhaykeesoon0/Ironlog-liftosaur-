@@ -8,6 +8,7 @@ import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.WorkoutRepository
 import com.ironlog.app.data.repository.userMessage
+import com.ironlog.app.domain.usecase.Gamification
 import com.ironlog.app.ui.format.formatDuration
 import com.ironlog.app.ui.format.formatFullDate
 import com.ironlog.app.ui.format.formatVolume
@@ -27,6 +28,8 @@ data class WorkoutDetailUiState(
     val justFinished: Boolean = false,
     val detail: WorkoutWithDetail? = null,
     val unit: UnitSystem = UnitSystem.METRIC,
+    val achievements: List<Gamification.Achievement> = emptyList(),
+    val xpEarned: Int = 0,
     val isDeleting: Boolean = false,
     val isDeleted: Boolean = false,
     val error: String? = null
@@ -46,6 +49,14 @@ class WorkoutDetailViewModel @Inject constructor(
 
     private val workoutId: String = checkNotNull(savedStateHandle.get<String>("id"))
 
+    /** What one pass of the three source flows produced. */
+    private data class Loaded(
+        val detail: WorkoutWithDetail?,
+        val unit: UnitSystem,
+        val achievements: List<Gamification.Achievement>,
+        val xpEarned: Int
+    )
+
     private val _state = MutableStateFlow(
         WorkoutDetailUiState(justFinished = savedStateHandle.get<Boolean>("justFinished") ?: false)
     )
@@ -53,12 +64,38 @@ class WorkoutDetailViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            combine(workoutRepository.observeWorkout(workoutId), profileRepository.observeUser()) { detail, user ->
-                detail to (user?.unitSystem ?: UnitSystem.METRIC)
+            combine(
+                workoutRepository.observeWorkout(workoutId),
+                profileRepository.observeUser(),
+                workoutRepository.observeHistory()
+            ) { detail, user, history ->
+                Loaded(
+                    detail = detail,
+                    unit = user?.unitSystem ?: UnitSystem.METRIC,
+                    // Only the sessions that came before this one can be beaten by it,
+                    // so a workout opened from deep in the history is judged against
+                    // what the user had done by then, not against everything since.
+                    achievements = detail?.workout?.let { workout ->
+                        val earlier = history
+                            .map { it.workout }
+                            .filter { it.startedAt < workout.startedAt }
+                            .sortedBy { it.startedAt }
+                        Gamification.achievementsFor(workout, earlier)
+                    }.orEmpty(),
+                    xpEarned = detail?.workout?.let { Gamification.workoutXp(it) } ?: 0
+                )
             }
                 .catch { e -> _state.update { it.copy(isLoading = false, error = e.userMessage("Could not load this workout")) } }
-                .collect { (detail, unit) ->
-                    _state.update { it.copy(isLoading = false, detail = detail, unit = unit) }
+                .collect { loaded ->
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            detail = loaded.detail,
+                            unit = loaded.unit,
+                            achievements = loaded.achievements,
+                            xpEarned = loaded.xpEarned
+                        )
+                    }
                 }
         }
     }
