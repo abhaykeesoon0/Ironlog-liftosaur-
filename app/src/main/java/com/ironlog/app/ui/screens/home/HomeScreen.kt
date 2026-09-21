@@ -47,6 +47,7 @@ import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.repository.EquipmentSettings
 import com.ironlog.app.domain.usecase.Recovery
 import com.ironlog.app.domain.usecase.TrainingMath
+import com.ironlog.app.ui.components.BodyMap
 import com.ironlog.app.ui.components.Caption
 import com.ironlog.app.ui.components.ChartPoint
 import com.ironlog.app.ui.components.ErrorBanner
@@ -270,6 +271,9 @@ fun HomeScreen(
             SectionHeader("Recovery")
             IronCard {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                    // Anything not in the list has not been trained recently
+                    // enough to still be recovering, so it is ready.
+                    BodyMap(readiness = state.recovery.associate { it.muscle to it.fraction })
                     state.recovery.take(RECOVERY_ROWS).forEach { muscle ->
                         RecoveryRow(muscle)
                     }
