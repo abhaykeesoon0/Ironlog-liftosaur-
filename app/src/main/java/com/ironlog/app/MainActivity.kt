@@ -37,8 +37,10 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.ironlog.app.core.audio.WelcomeSound
 import com.ironlog.app.core.security.BiometricGate
 import com.ironlog.app.data.repository.AuthRepository
+import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.SessionState
 import com.ironlog.app.ui.components.ErrorBanner
 import com.ironlog.app.ui.components.LoadingBlock
@@ -52,6 +54,7 @@ import com.ironlog.app.ui.theme.Space
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -74,7 +77,12 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) deepLinkRoute = intent?.getStringExtra(EXTRA_DEEP_LINK_ROUTE)
+        if (savedInstanceState == null) {
+            deepLinkRoute = intent?.getStringExtra(EXTRA_DEEP_LINK_ROUTE)
+            // Cold start only. A rotation is not an arrival, and neither is
+            // coming back from the camera, so neither one greets the user again.
+            mainViewModel.playWelcomeSound()
+        }
 
         setContent {
             IronLogTheme {
@@ -236,7 +244,9 @@ private fun BiometricLockScreen(
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val profileRepository: ProfileRepository,
+    private val welcomeSound: WelcomeSound
 ) : ViewModel() {
 
     val sessionState: StateFlow<SessionState> = authRepository.sessionState
@@ -245,6 +255,27 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { authRepository.restoreSession() }
+    }
+
+    /**
+     * Greets the user, if they have left the sound on. The preference lives on
+     * the device rather than the account, so this works on the sign-in screen
+     * too -- there is no user to read a setting from at that point.
+     */
+    fun playWelcomeSound() {
+        viewModelScope.launch {
+            if (profileRepository.welcomeSoundEnabled.first()) welcomeSound.play()
+        }
+    }
+
+    /**
+     * The clip is held until the activity is finished for good. Releasing it
+     * when playback starts would cut the sting off mid-note, because releasing
+     * a SoundPool stops whatever it is playing.
+     */
+    override fun onCleared() {
+        super.onCleared()
+        welcomeSound.release()
     }
 
     /**
