@@ -37,6 +37,13 @@ interface ProfileRepository {
     fun observeUser(): Flow<UserEntity?>
     val reminderSettings: Flow<ReminderSettings>
 
+    /**
+     * Whether the launch sting plays. Kept in DataStore rather than on the user
+     * row because it is a property of this phone, not of the account: the sound
+     * must be readable before anyone has signed in.
+     */
+    val welcomeSoundEnabled: Flow<Boolean>
+
     suspend fun updateProfile(name: String, bodyweightKg: Double?, heightCm: Double?): Result<Unit>
     suspend fun setUnitSystem(unit: UnitSystem): Result<Unit>
     suspend fun setBiometricLock(enabled: Boolean): Result<Unit>
@@ -44,6 +51,7 @@ interface ProfileRepository {
     suspend fun setWeeklyGoal(workouts: Int): Result<Unit>
     suspend fun setAvatar(path: String?): Result<Unit>
     suspend fun setReminder(settings: ReminderSettings): Result<Unit>
+    suspend fun setWelcomeSound(enabled: Boolean): Result<Unit>
 
     /** Requires the password again: deletion is irreversible and wipes every row the user owns. */
     suspend fun deleteAccount(password: CharArray): Result<Unit>
@@ -73,6 +81,9 @@ class ProfileRepositoryImpl @Inject constructor(
             minute = prefs[KEY_REMINDER_MINUTE] ?: 0
         )
     }
+
+    override val welcomeSoundEnabled: Flow<Boolean> =
+        dataStore.data.map { prefs -> prefs[KEY_WELCOME_SOUND] ?: true }
 
     override suspend fun updateProfile(name: String, bodyweightKg: Double?, heightCm: Double?): Result<Unit> =
         updateUser { user ->
@@ -119,6 +130,13 @@ class ProfileRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun setWelcomeSound(enabled: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            dataStore.edit { prefs -> prefs[KEY_WELCOME_SOUND] = enabled }
+            Unit
+        }
+    }
+
     override suspend fun deleteAccount(password: CharArray): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             runCatching {
@@ -157,5 +175,6 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_REMINDER_ON = booleanPreferencesKey("reminder_enabled")
         val KEY_REMINDER_HOUR = intPreferencesKey("reminder_hour")
         val KEY_REMINDER_MINUTE = intPreferencesKey("reminder_minute")
+        val KEY_WELCOME_SOUND = booleanPreferencesKey("welcome_sound_enabled")
     }
 }

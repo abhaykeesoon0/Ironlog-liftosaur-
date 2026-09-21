@@ -76,6 +76,7 @@ fun SettingsScreen(
 ) {
     val user by viewModel.user.collectAsStateWithLifecycle()
     val reminder by viewModel.reminder.collectAsStateWithLifecycle()
+    val welcomeSound by viewModel.welcomeSound.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val notifications = rememberPermissionState(AppPermission.NOTIFICATIONS)
@@ -150,6 +151,18 @@ fun SettingsScreen(
                         canIncrement = goal < 14
                     )
                 }
+            }
+
+            // -------------------------------------------------------------- sound
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Sound")
+            IronCard {
+                SwitchRow(
+                    title = "Welcome sound",
+                    caption = "A short chime when you open the app. Stays quiet on silent, and never plays over music you are already listening to.",
+                    checked = welcomeSound,
+                    onCheckedChange = viewModel::setWelcomeSound
+                )
             }
 
             // ---------------------------------------------------------- reminders

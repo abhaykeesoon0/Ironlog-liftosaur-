@@ -46,6 +46,9 @@ class SettingsViewModel @Inject constructor(
     val reminder: StateFlow<ReminderSettings> = profileRepository.reminderSettings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReminderSettings())
 
+    val welcomeSound: StateFlow<Boolean> = profileRepository.welcomeSoundEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
@@ -69,6 +72,9 @@ class SettingsViewModel @Inject constructor(
         val next = (u.weeklyGoalWorkouts + delta).coerceIn(1, 14)
         persist("Could not update the goal") { profileRepository.setWeeklyGoal(next) }
     }
+
+    fun setWelcomeSound(enabled: Boolean) =
+        persist("Could not change the welcome sound") { profileRepository.setWelcomeSound(enabled) }
 
     fun setReminderEnabled(enabled: Boolean) =
         persist("Could not update the reminder") { profileRepository.setReminder(reminder.value.copy(enabled = enabled)) }
