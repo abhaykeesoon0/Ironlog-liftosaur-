@@ -133,7 +133,31 @@ class ProfileRepositoryImpl @Inject constructor(
             user.copy(displayName = clean, bodyweightKg = bodyweightKg, heightCm = heightCm)
         }
 
-    override suspend fun setUnitSystem(unit: UnitSystem): Result<Unit> = updateUser { it.copy(unitSystem = unit) }
+    /**
+     * Changing the reading unit takes the equipment with it.
+     *
+     * Someone switching to pounds is telling the app what their gym is in, and
+     * leaving kilo plates behind would contradict the choice they just made.
+     * The plate set stays separately adjustable afterwards, for the minority who
+     * read in one unit and load the other.
+     */
+    override suspend fun setUnitSystem(unit: UnitSystem): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            updateUser { it.copy(unitSystem = unit) }.getOrThrow()
+
+            // Only after the user row is saved: if that failed, the equipment
+            // must not be left describing a unit the app never switched to.
+            val plateSet = when (unit) {
+                UnitSystem.METRIC -> PlateSet.KILOGRAMS
+                UnitSystem.IMPERIAL -> PlateSet.POUNDS
+            }
+            dataStore.edit { prefs ->
+                prefs[KEY_PLATE_SET] = plateSet.name
+                prefs[KEY_BAR_WEIGHT] = TrainingMath.defaultBarKg(plateSet)
+            }
+            Unit
+        }
+    }
 
     override suspend fun setBiometricLock(enabled: Boolean): Result<Unit> =
         updateUser { it.copy(biometricLockEnabled = enabled) }

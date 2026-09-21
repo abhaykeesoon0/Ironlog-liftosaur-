@@ -183,7 +183,7 @@ fun SettingsScreen(
                             .joinToString(" · ") { TrainingMath.plateLabel(equipment.plateSet, it) }
                     )
                     Caption(
-                        "Separate from the unit above: you can read in one and load the other.",
+                        "Follows the unit above when you change it. Set it back here if you read in one unit and load the other.",
                         Modifier.padding(top = Space.xs)
                     )
                     Hairline(Modifier.padding(vertical = Space.sm))
