@@ -44,6 +44,8 @@ import com.ironlog.app.ui.screens.history.HistoryScreen
 import com.ironlog.app.ui.screens.history.WorkoutDetailScreen
 import com.ironlog.app.ui.screens.goals.StrengthGoalsScreen
 import com.ironlog.app.ui.screens.home.HomeScreen
+import com.ironlog.app.ui.screens.rewards.QuestsScreen
+import com.ironlog.app.ui.screens.rewards.StoreScreen
 import com.ironlog.app.ui.screens.profile.ChangePasswordScreen
 import com.ironlog.app.ui.screens.profile.ProfileScreen
 import com.ironlog.app.ui.screens.profile.SettingsScreen
@@ -73,6 +75,8 @@ object Routes {
     const val WORKOUT_DETAIL = "history/{id}?justFinished={justFinished}"
     const val BODY = "body"
     const val STRENGTH_GOALS = "goals"
+    const val QUESTS = "quests"
+    const val STORE = "store"
     const val PHOTOS = "photos"
     const val CARDIO = "cardio"
     const val CARDIO_TRACK = "cardio/track"
@@ -184,7 +188,8 @@ fun MainNavHost(
                     onOpenCardio = { navController.navigate(Routes.CARDIO) },
                     onOpenWorkout = { navController.navigate(Routes.workoutDetail(it)) },
                     onOpenBody = { navController.navigate(Routes.BODY) },
-                    onOpenGoals = { navController.navigate(Routes.STRENGTH_GOALS) }
+                    onOpenGoals = { navController.navigate(Routes.STRENGTH_GOALS) },
+                    onOpenQuests = { navController.navigate(Routes.QUESTS) }
                 )
             }
             composable(Routes.ROUTINES) {
@@ -266,6 +271,15 @@ fun MainNavHost(
                     pickedExerciseIds = picked,
                     onPickedConsumed = { entry.savedStateHandle[Routes.PICKED_EXERCISES] = null }
                 )
+            }
+            composable(Routes.QUESTS) {
+                QuestsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenStore = { navController.navigate(Routes.STORE) }
+                )
+            }
+            composable(Routes.STORE) {
+                StoreScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.EXERCISE_DETAIL) {
                 ExerciseDetailScreen(onBack = { navController.popBackStack() })

@@ -11,6 +11,8 @@ import com.ironlog.app.data.entity.DailyActivityEntity
 import com.ironlog.app.data.entity.GoalMetric
 import com.ironlog.app.data.entity.PersonalRecordEntity
 import com.ironlog.app.data.entity.ProgressPhotoEntity
+import com.ironlog.app.data.entity.QuestClaimEntity
+import com.ironlog.app.data.entity.StorePurchaseEntity
 import com.ironlog.app.data.entity.StrengthGoalEntity
 import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.entity.WorkoutExerciseEntity
@@ -360,4 +362,55 @@ interface StrengthGoalDao {
         """
     )
     fun observeMuscleSessions(userId: String, since: Long): Flow<List<MuscleSessionRow>>
+}
+
+@Dao
+interface RewardsDao {
+
+    @Upsert suspend fun upsertClaim(claim: QuestClaimEntity)
+
+    @Query("SELECT * FROM quest_claims WHERE userId = :userId AND periodKey IN (:periodKeys)")
+    fun observeClaims(userId: String, periodKeys: List<String>): Flow<List<QuestClaimEntity>>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM quest_claims
+        WHERE userId = :userId AND questId = :questId AND periodKey = :periodKey
+        """
+    )
+    suspend fun claimCount(userId: String, questId: String, periodKey: String): Int
+
+    @Upsert suspend fun upsertPurchase(purchase: StorePurchaseEntity)
+
+    @Query("SELECT * FROM store_purchases WHERE userId = :userId")
+    fun observePurchases(userId: String): Flow<List<StorePurchaseEntity>>
+
+    @Query("SELECT * FROM store_purchases WHERE userId = :userId AND itemId = :itemId LIMIT 1")
+    suspend fun findPurchase(userId: String, itemId: String): StorePurchaseEntity?
+
+    @Query("SELECT * FROM store_purchases WHERE userId = :userId AND itemId IN (:itemIds)")
+    suspend fun purchasesIn(userId: String, itemIds: List<String>): List<StorePurchaseEntity>
+
+    /**
+     * The wallet: everything earned less everything spent.
+     *
+     * Derived rather than held as a running total, so a balance can never drift
+     * away from the claims and purchases that produced it -- there is no second
+     * number to keep in step.
+     */
+    @Query(
+        """
+        SELECT COALESCE((SELECT SUM(coins) FROM quest_claims WHERE userId = :userId), 0) -
+               COALESCE((SELECT SUM(coinsSpent) FROM store_purchases WHERE userId = :userId), 0)
+        """
+    )
+    fun observeBalance(userId: String): Flow<Int>
+
+    @Query(
+        """
+        SELECT COALESCE((SELECT SUM(coins) FROM quest_claims WHERE userId = :userId), 0) -
+               COALESCE((SELECT SUM(coinsSpent) FROM store_purchases WHERE userId = :userId), 0)
+        """
+    )
+    suspend fun balance(userId: String): Int
 }

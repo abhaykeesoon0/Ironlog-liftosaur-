@@ -266,3 +266,58 @@ data class StrengthGoalEntity(
     /** Set the first time the target is met, so a reached goal stays reached. */
     val achievedAt: Long? = null
 )
+
+/**
+ * A claimed quest reward.
+ *
+ * The row is the receipt: it records that this quest was paid out for this
+ * period, which is what stops a daily quest paying twice in a day and lets it
+ * come back tomorrow. The coin amount is stored with the claim rather than read
+ * from the catalogue at spend time, so re-pricing a quest later cannot
+ * retroactively change what someone was already paid.
+ */
+@Entity(
+    tableName = "quest_claims",
+    foreignKeys = [ForeignKey(
+        entity = UserEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["userId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index(value = ["userId", "questId", "periodKey"], unique = true)]
+)
+data class QuestClaimEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val questId: String,
+    /** The day or ISO week the claim belongs to, e.g. "2026-09-22" or "2026-W39". */
+    val periodKey: String,
+    val coins: Int,
+    val claimedAt: Long
+)
+
+/**
+ * Something bought from the store.
+ *
+ * The price paid is kept on the row for the same reason as a quest's payout: a
+ * later price change must not rewrite history. [isEquipped] is at most true for
+ * one item per category, which the repository enforces when equipping.
+ */
+@Entity(
+    tableName = "store_purchases",
+    foreignKeys = [ForeignKey(
+        entity = UserEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["userId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index(value = ["userId", "itemId"], unique = true)]
+)
+data class StorePurchaseEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val itemId: String,
+    val coinsSpent: Int,
+    val purchasedAt: Long,
+    val isEquipped: Boolean = false
+)

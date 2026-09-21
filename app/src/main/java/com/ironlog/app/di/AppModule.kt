@@ -11,6 +11,7 @@ import com.ironlog.app.data.dao.BodyDao
 import com.ironlog.app.data.dao.CardioDao
 import com.ironlog.app.data.dao.ExerciseDao
 import com.ironlog.app.data.dao.PersonalRecordDao
+import com.ironlog.app.data.dao.RewardsDao
 import com.ironlog.app.data.dao.RoutineDao
 import com.ironlog.app.data.dao.StrengthGoalDao
 import com.ironlog.app.data.dao.UserDao
@@ -23,6 +24,8 @@ import com.ironlog.app.data.repository.AuthRepository
 import com.ironlog.app.data.repository.AuthRepositoryImpl
 import com.ironlog.app.data.repository.BodyRepository
 import com.ironlog.app.data.repository.BodyRepositoryImpl
+import com.ironlog.app.data.repository.RewardsRepository
+import com.ironlog.app.data.repository.RewardsRepositoryImpl
 import com.ironlog.app.data.repository.StrengthGoalRepository
 import com.ironlog.app.data.repository.StrengthGoalRepositoryImpl
 import com.ironlog.app.data.repository.CardioRepository
@@ -69,7 +72,7 @@ object DatabaseModule {
             // No destructive fallback: silently wiping a user's training history
             // on a schema change would be a data-loss bug, not a convenience.
             // Migrations are added explicitly when the schema moves.
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
 
     /**
@@ -116,6 +119,58 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * Adds the quest and store tables. Additive again: nothing existing is
+     * read, rewritten or dropped, so an upgrade cannot cost anyone their log.
+     */
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `quest_claims` (
+                    `id` TEXT NOT NULL,
+                    `userId` TEXT NOT NULL,
+                    `questId` TEXT NOT NULL,
+                    `periodKey` TEXT NOT NULL,
+                    `coins` INTEGER NOT NULL,
+                    `claimedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`userId`) REFERENCES `users`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                `index_quest_claims_userId_questId_periodKey`
+                ON `quest_claims` (`userId`, `questId`, `periodKey`)
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `store_purchases` (
+                    `id` TEXT NOT NULL,
+                    `userId` TEXT NOT NULL,
+                    `itemId` TEXT NOT NULL,
+                    `coinsSpent` INTEGER NOT NULL,
+                    `purchasedAt` INTEGER NOT NULL,
+                    `isEquipped` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`userId`) REFERENCES `users`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS `index_store_purchases_userId_itemId`
+                ON `store_purchases` (`userId`, `itemId`)
+                """.trimIndent()
+            )
+        }
+    }
+
     @Provides fun provideUserDao(db: AppDatabase): UserDao = db.userDao()
     @Provides fun provideExerciseDao(db: AppDatabase): ExerciseDao = db.exerciseDao()
     @Provides fun provideRoutineDao(db: AppDatabase): RoutineDao = db.routineDao()
@@ -124,6 +179,7 @@ object DatabaseModule {
     @Provides fun provideBodyDao(db: AppDatabase): BodyDao = db.bodyDao()
     @Provides fun provideCardioDao(db: AppDatabase): CardioDao = db.cardioDao()
     @Provides fun provideStrengthGoalDao(db: AppDatabase): StrengthGoalDao = db.strengthGoalDao()
+    @Provides fun provideRewardsDao(db: AppDatabase): RewardsDao = db.rewardsDao()
 
     /** Non-sensitive preferences only; session secrets live in SecureTokenStore. */
     @Provides
@@ -174,6 +230,9 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindStrengthGoalRepository(impl: StrengthGoalRepositoryImpl): StrengthGoalRepository
+
+    @Binds @Singleton
+    abstract fun bindRewardsRepository(impl: RewardsRepositoryImpl): RewardsRepository
 
     @Binds @Singleton
     abstract fun bindCardioRepository(impl: CardioRepositoryImpl): CardioRepository
