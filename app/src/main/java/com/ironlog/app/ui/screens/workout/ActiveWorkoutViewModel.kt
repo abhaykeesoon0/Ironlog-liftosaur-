@@ -10,6 +10,7 @@ import com.ironlog.app.data.entity.RecordType
 import com.ironlog.app.data.entity.SetType
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.WorkoutSetEntity
+import com.ironlog.app.data.repository.EquipmentSettings
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.WorkoutRepository
 import com.ironlog.app.data.repository.userMessage
@@ -46,7 +47,8 @@ data class ActiveWorkoutUiState(
     val autoRestTimer: Boolean = true,
     val volumeKg: Double = 0.0,
     val completedSets: Int = 0,
-    val isFinishing: Boolean = false
+    val isFinishing: Boolean = false,
+    val equipment: EquipmentSettings = EquipmentSettings()
 )
 
 sealed interface ActiveWorkoutEvent {
@@ -91,14 +93,25 @@ class ActiveWorkoutViewModel @Inject constructor(
     /** Serialises writes so a tick always lands after any pending field save. */
     private val writeLock = Mutex()
 
+    /** One pass of the four source flows. */
+    private data class Loaded(
+        val active: com.ironlog.app.data.dao.WorkoutWithDetail?,
+        val user: com.ironlog.app.data.entity.UserEntity?,
+        val previous: Map<String, List<WorkoutSetEntity>>,
+        val equipment: EquipmentSettings
+    )
+
     init {
         viewModelScope.launch {
             combine(
                 workoutRepository.observeActive(),
                 profileRepository.observeUser(),
-                previousCache
-            ) { active, user, previous -> Triple(active, user, previous) }
-                .collect { (active, user, previous) ->
+                previousCache,
+                profileRepository.equipment
+            ) { active, user, previous, equipment ->
+                Loaded(active, user, previous, equipment)
+            }
+                .collect { (active, user, previous, equipment) ->
                     if (active == null) {
                         // Null before the first load means there is no session; null
                         // later means it was discarded. Either way the screen closes,
@@ -134,7 +147,8 @@ class ActiveWorkoutViewModel @Inject constructor(
                             unit = user?.unitSystem ?: UnitSystem.METRIC,
                             autoRestTimer = user?.autoRestTimerEnabled ?: true,
                             volumeKg = TrainingMath.totalVolume(allSets),
-                            completedSets = allSets.count { set -> set.isCompleted }
+                            completedSets = allSets.count { set -> set.isCompleted },
+                            equipment = equipment
                         )
                     }
                 }

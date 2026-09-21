@@ -1,5 +1,6 @@
 package com.ironlog.app.domain.usecase
 
+import com.ironlog.app.data.entity.PlateSet
 import com.ironlog.app.data.entity.SetType
 import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.entity.WorkoutSetEntity
@@ -121,11 +122,56 @@ object TrainingMath {
         return PlateLoading(
             plates = plates,
             achievableTotalKg = barWeightKg + loadedPerSide * 2,
-            remainderKg = if (abs(remaining) < 1e-9) 0.0 else remaining
+            remainderKg = if (abs(remaining) < EXACT_TOLERANCE_KG) 0.0 else remaining
         )
     }
 
     val DEFAULT_PLATES_KG = listOf(25.0, 20.0, 15.0, 10.0, 5.0, 2.5, 1.25)
+
+    /**
+     * How close counts as exact.
+     *
+     * Ten grams, rather than a floating-point epsilon: pound plates are held as
+     * converted kilograms, so a load that is exact on the rack can come out a
+     * fraction of a gram short in arithmetic. Reporting that as "closest is"
+     * next to a figure identical to the target reads as a bug to the user, and
+     * no plate in any gym is finer than this.
+     */
+    private const val EXACT_TOLERANCE_KG = 0.01
+
+    /**
+     * Pound plates, held in kilograms because the loading maths works in
+     * kilograms throughout. These are the denominations on a typical American
+     * rack; the fractional plates a few gyms own are left out rather than
+     * promising a load most lifters cannot actually make.
+     */
+    val PLATES_LB = listOf(45.0, 35.0, 25.0, 10.0, 5.0, 2.5)
+
+    fun platesFor(set: PlateSet): List<Double> = when (set) {
+        PlateSet.KILOGRAMS -> DEFAULT_PLATES_KG
+        PlateSet.POUNDS -> PLATES_LB.map { lbToKg(it) }
+    }
+
+    /** The bar that comes with the set: 20 kg, or 45 lb on a pound rack. */
+    fun defaultBarKg(set: PlateSet): Double = when (set) {
+        PlateSet.KILOGRAMS -> 20.0
+        PlateSet.POUNDS -> lbToKg(45.0)
+    }
+
+    /**
+     * A plate written in its own unit. A 45 lb plate reads as "45 lb" even for
+     * someone whose totals are shown in kilograms, because that is the number
+     * stamped on the plate they are about to pick up.
+     */
+    fun plateLabel(set: PlateSet, plateKg: Double): String = when (set) {
+        PlateSet.KILOGRAMS -> "${plateKg.stripTrailingZeroes()} kg"
+        PlateSet.POUNDS -> "${kgToLb(plateKg).roundToNearestHalf().stripTrailingZeroes()} lb"
+    }
+
+    private fun Double.roundToNearestHalf(): Double = (this * 2).roundToInt() / 2.0
+
+    private fun Double.stripTrailingZeroes(): String =
+        if (this % 1.0 == 0.0) toInt().toString() else toString()
 
     /**
      * Consecutive weeks containing at least one workout, counting back from now.

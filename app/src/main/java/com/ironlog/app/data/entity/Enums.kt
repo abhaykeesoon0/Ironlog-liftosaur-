@@ -48,6 +48,19 @@ enum class MuscleGroup(val label: String) {
  * estimate counts progress made at any rep range, while a top weight is the
  * number a lifter can claim to have actually put on the bar.
  */
+/**
+ * Which plates the gym actually has.
+ *
+ * Separate from the display unit on purpose: plenty of lifters read in pounds
+ * while loading a kilo bar, or the other way round, and guessing the equipment
+ * from the reading preference produces a plate list that does not exist in the
+ * room they are standing in.
+ */
+enum class PlateSet(val label: String) {
+    KILOGRAMS("Kilograms"),
+    POUNDS("Pounds")
+}
+
 enum class GoalMetric(val label: String, val shortLabel: String) {
     ESTIMATED_1RM("Estimated 1RM", "1RM"),
     TOP_WEIGHT("Top weight", "Weight")

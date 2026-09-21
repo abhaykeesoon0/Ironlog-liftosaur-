@@ -48,6 +48,8 @@ import com.ironlog.app.core.permissions.AppPermission
 import com.ironlog.app.core.permissions.openAppSettings
 import com.ironlog.app.core.permissions.rememberPermissionState
 import com.ironlog.app.core.security.BiometricAvailability
+import com.ironlog.app.data.entity.PlateSet
+import com.ironlog.app.data.repository.EquipmentSettings
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.repository.ExportKind
 import com.ironlog.app.ui.components.Caption
@@ -58,6 +60,7 @@ import com.ironlog.app.ui.components.IronChip
 import com.ironlog.app.ui.components.IronTextField
 import com.ironlog.app.ui.components.IronTopBar
 import com.ironlog.app.ui.components.SecondaryButton
+import com.ironlog.app.domain.usecase.TrainingMath
 import com.ironlog.app.ui.components.SectionHeader
 import com.ironlog.app.ui.format.formatClock
 import com.ironlog.app.ui.theme.Chalk
@@ -77,6 +80,7 @@ fun SettingsScreen(
     val user by viewModel.user.collectAsStateWithLifecycle()
     val reminder by viewModel.reminder.collectAsStateWithLifecycle()
     val welcomeSound by viewModel.welcomeSound.collectAsStateWithLifecycle()
+    val equipment by viewModel.equipment.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val notifications = rememberPermissionState(AppPermission.NOTIFICATIONS)
@@ -149,6 +153,48 @@ fun SettingsScreen(
                         caption = "Workouts per week",
                         canDecrement = goal > 1,
                         canIncrement = goal < 14
+                    )
+                }
+            }
+
+            // ---------------------------------------------------------- equipment
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Equipment")
+            IronCard {
+                Column {
+                    Text(
+                        "Plates in the gym",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Chalk
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        PlateSet.entries.forEach { option ->
+                            IronChip(
+                                text = option.label,
+                                selected = equipment.plateSet == option,
+                                onClick = { viewModel.setPlateSet(option) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(Space.sm))
+                    Caption(
+                        TrainingMath.platesFor(equipment.plateSet)
+                            .joinToString(" · ") { TrainingMath.plateLabel(equipment.plateSet, it) }
+                    )
+                    Caption(
+                        "Separate from the unit above: you can read in one and load the other.",
+                        Modifier.padding(top = Space.xs)
+                    )
+                    Hairline(Modifier.padding(vertical = Space.sm))
+                    Stepper(
+                        label = "Default bar",
+                        value = TrainingMath.plateLabel(equipment.plateSet, equipment.barWeightKg),
+                        onDecrement = { viewModel.changeBar(-1) },
+                        onIncrement = { viewModel.changeBar(1) },
+                        caption = "Used when an exercise has no bar weight of its own",
+                        canDecrement = equipment.barWeightKg > EquipmentSettings.MIN_BAR_KG,
+                        canIncrement = equipment.barWeightKg < EquipmentSettings.MAX_BAR_KG
                     )
                 }
             }
