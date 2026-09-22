@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
@@ -70,6 +71,7 @@ import com.ironlog.app.ui.theme.Touch
 fun ExerciseLibraryScreen(
     pickMode: Boolean,
     onBack: () -> Unit,
+    onOpenOnline: () -> Unit,
     onPicked: (List<String>) -> Unit,
     onOpenExercise: (String) -> Unit,
     viewModel: ExerciseLibraryViewModel = hiltViewModel()
@@ -88,6 +90,13 @@ fun ExerciseLibraryScreen(
             title = if (pickMode) "Add exercises" else "Exercise library",
             onBack = onBack,
             actions = {
+                IconButton(onClick = onOpenOnline) {
+                    Icon(
+                        Icons.Default.CloudDownload,
+                        contentDescription = "Browse the online library",
+                        tint = Chalk
+                    )
+                }
                 IconButton(onClick = viewModel::openCreate) {
                     Icon(Icons.Default.Add, contentDescription = "Create exercise", tint = Chalk)
                 }

@@ -44,6 +44,7 @@ import com.ironlog.app.ui.screens.history.HistoryScreen
 import com.ironlog.app.ui.screens.history.WorkoutDetailScreen
 import com.ironlog.app.ui.screens.goals.StrengthGoalsScreen
 import com.ironlog.app.ui.screens.coach.CoachScreen
+import com.ironlog.app.ui.screens.exercises.OnlineLibraryScreen
 import com.ironlog.app.ui.screens.coach.GenerateRoutineScreen
 import com.ironlog.app.ui.screens.home.HomeScreen
 import com.ironlog.app.ui.screens.rewards.QuestsScreen
@@ -79,6 +80,7 @@ object Routes {
     const val STRENGTH_GOALS = "goals"
     const val QUESTS = "quests"
     const val COACH = "coach"
+    const val ONLINE_LIBRARY = "exercises/online"
     const val GENERATE_ROUTINE = "routines/generate"
     const val STORE = "store"
     const val PHOTOS = "photos"
@@ -261,6 +263,7 @@ fun MainNavHost(
                 ExerciseLibraryScreen(
                     pickMode = pickMode,
                     onBack = { navController.popBackStack() },
+                    onOpenOnline = { navController.navigate(Routes.ONLINE_LIBRARY) },
                     onPicked = { ids ->
                         navController.previousBackStackEntry?.savedStateHandle
                             ?.set(Routes.PICKED_EXERCISES, ArrayList(ids))
@@ -277,6 +280,9 @@ fun MainNavHost(
                     pickedExerciseIds = picked,
                     onPickedConsumed = { entry.savedStateHandle[Routes.PICKED_EXERCISES] = null }
                 )
+            }
+            composable(Routes.ONLINE_LIBRARY) {
+                OnlineLibraryScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.COACH) {
                 CoachScreen(onBack = { navController.popBackStack() })
