@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QuestionAnswer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -90,6 +90,7 @@ import com.ironlog.app.ui.theme.PrGold
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Space
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
 
 @Composable
 fun HomeScreen(
@@ -100,6 +101,7 @@ fun HomeScreen(
     onOpenBody: () -> Unit,
     onOpenGoals: () -> Unit,
     onOpenQuests: () -> Unit,
+    onOpenCoach: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
     goalsViewModel: HomeGoalsViewModel = hiltViewModel(),
     questsViewModel: QuestsViewModel = hiltViewModel(),
@@ -274,6 +276,29 @@ fun HomeScreen(
                 Column(Modifier.weight(1f)) {
                     Text("Outdoor cardio", style = MaterialTheme.typography.titleMedium, color = Chalk)
                     Caption("Record a run, walk or ride with GPS")
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
+            }
+        }
+
+        Spacer(Modifier.height(Space.xl))
+        SectionHeader("Coach")
+        IronCard(onClick = onOpenCoach) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.QuestionAnswer,
+                    contentDescription = null,
+                    tint = ChalkDim,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.width(Space.md))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Ask about training",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Chalk
+                    )
+                    Caption("What to train today, how to progress, how you are doing.")
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
             }
@@ -472,12 +497,18 @@ fun HomeScreen(
 
 @Composable
 private fun ActiveWorkoutCard(active: ActiveWorkoutInfo, onResume: () -> Unit) {
-    val elapsed by produceState(initialValue = 0, active.startedAt) {
-        while (true) {
-            value = ((System.currentTimeMillis() - active.startedAt) / 1000).toInt()
-            delay(1000)
+    // A ticking flow rather than produceState: collectAsStateWithLifecycle stops
+    // the timer when the screen is not started, so a session left open in the
+    // background is not waking the app once a second to recompute a number
+    // nobody is looking at.
+    val elapsed by remember(active.startedAt) {
+        flow {
+            while (true) {
+                emit(((System.currentTimeMillis() - active.startedAt) / 1000).toInt())
+                delay(1000)
+            }
         }
-    }
+    }.collectAsStateWithLifecycle(initialValue = 0)
     IronCard(onClick = onResume) {
         Column {
             Caption("WORKOUT IN PROGRESS")

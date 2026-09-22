@@ -11,6 +11,7 @@ import com.ironlog.app.data.entity.UserEntity
 import com.ironlog.app.data.repository.ExportKind
 import com.ironlog.app.data.repository.ExportRepository
 import com.ironlog.app.data.repository.ProfileRepository
+import com.ironlog.app.core.ai.CloudAssistant
 import com.ironlog.app.data.entity.PlateSet
 import com.ironlog.app.data.entity.StepSource
 import com.ironlog.app.data.repository.EquipmentSettings
@@ -40,6 +41,7 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
+    private val cloudAssistant: CloudAssistant,
     private val exportRepository: ExportRepository,
     private val biometricGate: BiometricGate
 ) : ViewModel() {
@@ -82,6 +84,16 @@ class SettingsViewModel @Inject constructor(
         val next = (u.weeklyGoalWorkouts + delta).coerceIn(1, 14)
         persist("Could not update the goal") { profileRepository.setWeeklyGoal(next) }
     }
+
+    /** True when a Claude API key has been saved for the optional assistant. */
+    fun hasAssistantKey(): Boolean = cloudAssistant.hasKey()
+
+    fun saveAssistantKey(key: String) {
+        cloudAssistant.saveKey(key)
+        _state.update { it.copy(error = null) }
+    }
+
+    fun clearAssistantKey() = cloudAssistant.saveKey("")
 
     fun setStepSource(source: StepSource) =
         persist("Could not change the step source") { profileRepository.setStepSource(source) }

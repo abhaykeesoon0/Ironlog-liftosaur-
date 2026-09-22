@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -50,6 +51,7 @@ import com.ironlog.app.ui.theme.Space
 
 @Composable
 fun RoutinesScreen(
+    onGenerateRoutine: () -> Unit,
     onEditRoutine: (String?) -> Unit,
     onWorkoutStarted: () -> Unit,
     onOpenLibrary: () -> Unit,
@@ -110,6 +112,11 @@ fun RoutinesScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
+                SecondaryButton(
+                    text = "Build me a week",
+                    onClick = onGenerateRoutine,
+                    leadingIcon = Icons.Default.AutoAwesome
+                )
             }
         }
 

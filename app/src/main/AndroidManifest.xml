@@ -27,6 +27,13 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!--
+        Used by one optional feature only: the cloud assistant, which is off
+        until the user turns it on and supplies their own API key. Everything
+        else in the app works with no network at all.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
         Steps written by a smartwatch's own app. Health Connect is on-device:
         this is an IPC read from another app on the same phone, not a network
         call, so the offline design holds.

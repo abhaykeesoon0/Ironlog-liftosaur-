@@ -43,6 +43,8 @@ import com.ironlog.app.ui.screens.exercises.ExerciseLibraryScreen
 import com.ironlog.app.ui.screens.history.HistoryScreen
 import com.ironlog.app.ui.screens.history.WorkoutDetailScreen
 import com.ironlog.app.ui.screens.goals.StrengthGoalsScreen
+import com.ironlog.app.ui.screens.coach.CoachScreen
+import com.ironlog.app.ui.screens.coach.GenerateRoutineScreen
 import com.ironlog.app.ui.screens.home.HomeScreen
 import com.ironlog.app.ui.screens.rewards.QuestsScreen
 import com.ironlog.app.ui.screens.rewards.StoreScreen
@@ -76,6 +78,8 @@ object Routes {
     const val BODY = "body"
     const val STRENGTH_GOALS = "goals"
     const val QUESTS = "quests"
+    const val COACH = "coach"
+    const val GENERATE_ROUTINE = "routines/generate"
     const val STORE = "store"
     const val PHOTOS = "photos"
     const val CARDIO = "cardio"
@@ -189,11 +193,13 @@ fun MainNavHost(
                     onOpenWorkout = { navController.navigate(Routes.workoutDetail(it)) },
                     onOpenBody = { navController.navigate(Routes.BODY) },
                     onOpenGoals = { navController.navigate(Routes.STRENGTH_GOALS) },
-                    onOpenQuests = { navController.navigate(Routes.QUESTS) }
+                    onOpenQuests = { navController.navigate(Routes.QUESTS) },
+                    onOpenCoach = { navController.navigate(Routes.COACH) }
                 )
             }
             composable(Routes.ROUTINES) {
                 RoutinesScreen(
+                    onGenerateRoutine = { navController.navigate(Routes.GENERATE_ROUTINE) },
                     onEditRoutine = { navController.navigate(Routes.routineEdit(it)) },
                     onWorkoutStarted = { navController.navigate(Routes.ACTIVE_WORKOUT) },
                     onOpenLibrary = { navController.navigate(Routes.exerciseLibrary(pick = false)) }
@@ -270,6 +276,15 @@ fun MainNavHost(
                     onPickExercise = { navController.navigate(Routes.exerciseLibrary(pick = true)) },
                     pickedExerciseIds = picked,
                     onPickedConsumed = { entry.savedStateHandle[Routes.PICKED_EXERCISES] = null }
+                )
+            }
+            composable(Routes.COACH) {
+                CoachScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.GENERATE_ROUTINE) {
+                GenerateRoutineScreen(
+                    onBack = { navController.popBackStack() },
+                    onSaved = { navController.popBackStack() }
                 )
             }
             composable(Routes.QUESTS) {
