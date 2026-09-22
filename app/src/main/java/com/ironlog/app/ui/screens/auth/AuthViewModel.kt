@@ -74,6 +74,26 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Sets a new password after the device lock has been satisfied.
+     *
+     * The screen runs the biometric prompt; this only performs the reset, so
+     * the check and the write stay in the layers that own them.
+     */
+    fun resetPasswordAfterDeviceAuth(newPassword: String) {
+        if (_state.value.isSubmitting) return
+        _state.update { it.copy(isSubmitting = true, generalError = null) }
+        viewModelScope.launch {
+            val result = authRepository.resetPasswordAfterDeviceAuth(
+                _state.value.email,
+                newPassword.toCharArray()
+            )
+            handleResult(result)
+        }
+    }
+
+    fun showError(message: String) = _state.update { it.copy(generalError = message) }
+
     fun signIn() {
         if (!_state.value.canSubmitSignIn) return
         _state.update { it.copy(isSubmitting = true, generalError = null) }

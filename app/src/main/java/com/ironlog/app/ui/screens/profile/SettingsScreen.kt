@@ -49,6 +49,7 @@ import com.ironlog.app.core.permissions.openAppSettings
 import com.ironlog.app.core.permissions.rememberPermissionState
 import com.ironlog.app.core.security.BiometricAvailability
 import com.ironlog.app.data.entity.PlateSet
+import com.ironlog.app.data.entity.StepSource
 import com.ironlog.app.data.repository.EquipmentSettings
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.repository.ExportKind
@@ -81,6 +82,7 @@ fun SettingsScreen(
     val reminder by viewModel.reminder.collectAsStateWithLifecycle()
     val welcomeSound by viewModel.welcomeSound.collectAsStateWithLifecycle()
     val equipment by viewModel.equipment.collectAsStateWithLifecycle()
+    val stepSource by viewModel.stepSource.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val notifications = rememberPermissionState(AppPermission.NOTIFICATIONS)
@@ -154,6 +156,32 @@ fun SettingsScreen(
                         canDecrement = goal > 1,
                         canIncrement = goal < 14
                     )
+                }
+            }
+
+            // -------------------------------------------------------------- steps
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Steps")
+            IronCard {
+                Column {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        StepSource.entries.forEach { option ->
+                            IronChip(
+                                text = option.label,
+                                selected = stepSource == option,
+                                onClick = { viewModel.setStepSource(option) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(Space.sm))
+                    Caption(stepSource.detail)
+                    if (stepSource == StepSource.HEALTH_CONNECT) {
+                        Caption(
+                            "A watch cannot be read over Bluetooth directly, so its steps are " +
+                                "collected from Health Connect, where your watch's own app writes them.",
+                            Modifier.padding(top = Space.xs)
+                        )
+                    }
                 }
             }
 

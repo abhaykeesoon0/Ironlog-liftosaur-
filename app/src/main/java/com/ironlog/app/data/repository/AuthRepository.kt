@@ -41,6 +41,24 @@ interface AuthRepository {
     suspend fun refreshIfNeeded(): Boolean
     suspend fun signOut()
     suspend fun changePassword(userId: String, current: CharArray, new: CharArray): AuthResult
+
+    /**
+     * Sets a new password for an account whose password has been forgotten.
+     *
+     * There is no "email it back": the app stores a salted hash and cannot
+     * recover a password, and sending one by email would be handing the
+     * credential to a third party in plaintext. It is also offline by design,
+     * so there is nothing to send with.
+     *
+     * The device's own lock stands in for the reset link instead. That is a
+     * sound boundary here because the training data never leaves the handset:
+     * anyone who can satisfy the screen lock can already read the database, so
+     * requiring it to reset a password grants nothing new, while a stranger who
+     * picks the phone up has neither.
+     *
+     * Callers must complete a biometric or device-credential prompt first.
+     */
+    suspend fun resetPasswordAfterDeviceAuth(email: String, new: CharArray): AuthResult
     fun observeUser(userId: String): Flow<UserEntity?>
     suspend fun currentUser(): UserEntity?
     fun markBiometricUnlocked()
@@ -218,6 +236,32 @@ class AuthRepositoryImpl @Inject constructor(
         tokenStore.clearSession()
         _sessionState.value = SessionState.SignedOut
     }
+
+    override suspend fun resetPasswordAfterDeviceAuth(email: String, new: CharArray): AuthResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val cleanEmail = Validators.sanitiseEmail(email)
+                val user = userDao.findByEmail(cleanEmail)
+                    ?: return@withContext AuthResult.Failure(
+                        "No account on this phone uses that email",
+                        AuthField.EMAIL
+                    )
+                Validators.validatePassword(new)?.let {
+                    return@withContext AuthResult.Failure(it, AuthField.PASSWORD)
+                }
+
+                val salt = hasher.newSalt()
+                userDao.update(user.copy(passwordHash = hasher.hash(new, salt), passwordSalt = salt))
+
+                // Signs in as part of the reset: the user has just proved they
+                // hold the device and set the password, so a second trip
+                // through the sign-in form proves nothing further.
+                issueSession(user)
+                AuthResult.Success(user.id)
+            } finally {
+                new.wipe()
+            }
+        }
 
     override suspend fun changePassword(
         userId: String,

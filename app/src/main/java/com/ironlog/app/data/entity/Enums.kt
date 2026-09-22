@@ -56,6 +56,18 @@ enum class MuscleGroup(val label: String) {
  * from the reading preference produces a plate list that does not exist in the
  * room they are standing in.
  */
+/**
+ * Where today's step count comes from.
+ *
+ * A watch cannot be read over Bluetooth directly -- those protocols are the
+ * vendor's -- but every watch app writes into Health Connect, so that is where
+ * a watch's steps are collected from.
+ */
+enum class StepSource(val label: String, val detail: String) {
+    PHONE("Phone", "The pedometer built into this handset."),
+    HEALTH_CONNECT("Health Connect", "Steps from your watch or any app that writes them.")
+}
+
 enum class PlateSet(val label: String) {
     KILOGRAMS("Kilograms"),
     POUNDS("Pounds")

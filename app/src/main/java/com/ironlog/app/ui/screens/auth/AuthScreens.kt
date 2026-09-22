@@ -27,6 +27,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ironlog.app.ui.components.ErrorBanner
 import com.ironlog.app.ui.components.IronTextField
 import com.ironlog.app.ui.components.PrimaryButton
+import androidx.fragment.app.FragmentActivity
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.ironlog.app.core.security.BiometricGate
+import com.ironlog.app.ui.theme.Slate700
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.compose.ui.platform.LocalContext
 import com.ironlog.app.ui.theme.Chalk
 import com.ironlog.app.ui.theme.ChalkDim
 import com.ironlog.app.ui.theme.Space
@@ -38,6 +48,9 @@ fun SignInScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val activity = LocalContext.current.findFragmentActivity()
+    val biometricGate = remember(activity) { activity?.let { BiometricGate(it) } }
+    var resetting by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isComplete) {
         if (state.isComplete) onSignedIn()
@@ -82,6 +95,32 @@ fun SignInScreen(
 
         TextButton(
             onClick = {
+                // The email is what the reset applies to, so it has to be
+                // filled in before the device lock is worth asking for.
+                when {
+                    state.email.isBlank() ->
+                        viewModel.showError("Enter your email first, then reset the password")
+                    biometricGate == null || !biometricGate.isAvailable() ->
+                        viewModel.showError(
+                            "Set a screen lock, fingerprint or face unlock on this phone to reset a password"
+                        )
+                    else -> biometricGate.prompt(
+                        activity = activity!!,
+                        title = "Reset your password",
+                        subtitle = "Unlock this phone to set a new password",
+                        onSuccess = { resetting = true },
+                        onFailure = { viewModel.showError(it) },
+                        onCancelled = { }
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Forgotten your password?", color = ChalkDim)
+        }
+
+        TextButton(
+            onClick = {
                 viewModel.reset()
                 onNavigateToRegister()
             },
@@ -90,6 +129,88 @@ fun SignInScreen(
             Text("No account yet? Create one", color = ChalkDim)
         }
     }
+
+    if (resetting) {
+        NewPasswordDialog(
+            email = state.email,
+            isSubmitting = state.isSubmitting,
+            onDismiss = { resetting = false },
+            onConfirm = { password ->
+                viewModel.resetPasswordAfterDeviceAuth(password)
+                resetting = false
+            }
+        )
+    }
+}
+
+/**
+ * The hosting activity, which BiometricPrompt needs to show its dialog.
+ *
+ * Walks the ContextWrapper chain rather than casting: a Compose LocalContext
+ * can be a themed wrapper around the activity rather than the activity itself.
+ */
+private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
+    is FragmentActivity -> this
+    is ContextWrapper -> baseContext.findFragmentActivity()
+    else -> null
+}
+
+/**
+ * Sets the replacement password once the device lock has been satisfied.
+ *
+ * The old password is never asked for, and never shown: it cannot be, because
+ * only a salted hash of it was ever stored.
+ */
+@Composable
+private fun NewPasswordDialog(
+    email: String,
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    val mismatch = confirm.isNotEmpty() && password != confirm
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New password", color = Chalk) },
+        text = {
+            Column {
+                Text(
+                    "For $email. Your training history is untouched.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ChalkDim
+                )
+                Spacer(Modifier.height(Space.md))
+                IronTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = "New password",
+                    isPassword = true,
+                    enabled = !isSubmitting
+                )
+                Spacer(Modifier.height(Space.md))
+                IronTextField(
+                    value = confirm,
+                    onValueChange = { confirm = it },
+                    label = "Confirm password",
+                    isPassword = true,
+                    enabled = !isSubmitting,
+                    error = if (mismatch) "Passwords don't match" else null,
+                    imeAction = ImeAction.Done
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(password) },
+                enabled = !isSubmitting && password.isNotBlank() && password == confirm
+            ) { Text("Save", color = Chalk) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = ChalkDim) } },
+        containerColor = Slate700
+    )
 }
 
 @Composable

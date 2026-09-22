@@ -26,6 +26,13 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!--
+        Steps written by a smartwatch's own app. Health Connect is on-device:
+        this is an IPC read from another app on the same phone, not a network
+        call, so the offline design holds.
+    -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+
     <!-- ============================================================
          DEVICE INTEGRATION 5 - FILE STORAGE (photo + CSV/JSON export)
          ============================================================ -->
@@ -110,4 +117,9 @@
         </provider>
 
     </application>
+
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
 </manifest>
