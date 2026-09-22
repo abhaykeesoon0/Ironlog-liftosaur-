@@ -197,7 +197,16 @@ private fun MovementDemoDialog(exercise: ExerciseEntity, onDismiss: () -> Unit) 
         title = { Text(exercise.name, color = Chalk) },
         text = {
             Column {
-                MovementAnimation(pattern)
+                MovementAnimation(
+                    pattern = pattern,
+                    primaryMuscle = exercise.primaryMuscle,
+                    secondaryMuscles = exercise.secondaryMuscles
+                        .split(",")
+                        .mapNotNull { name ->
+                            runCatching { MuscleGroup.valueOf(name.trim()) }.getOrNull()
+                        }
+                        .toSet()
+                )
                 if (exercise.instructions.isNotBlank()) {
                     Spacer(Modifier.height(Space.md))
                     Text(
