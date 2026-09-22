@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.ironlog.app.data.entity.MuscleGroup
 import com.ironlog.app.ui.theme.ChalkFaint
 import com.ironlog.app.ui.theme.Plate10
+import com.ironlog.app.ui.theme.Plate15
+import com.ironlog.app.ui.theme.Slate600
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.theme.Space
@@ -102,12 +104,11 @@ private fun Figure(
 
             // The body first, so the parts we do not track -- head, hands, feet
             // -- still read as a person rather than as floating muscle.
-            SILHOUETTE.forEach { shape -> drawPath(shape.toPath(::at, figure), Slate700) }
+            SILHOUETTE.forEach { shape -> drawPath(shape.toPath(::at, figure), BODY) }
 
             regions.forEach { region ->
                 val ready = readiness[region.muscle] ?: 1f
-                // Pale when just trained, deep green once ready.
-                val colour = lerp(RECOVERING, READY, ready.coerceIn(0f, 1f))
+                val colour = shadeFor(ready)
                 region.shapes.forEach { shape ->
                     val path = shape.toPath(::at, figure)
                     drawPath(path, colour)
@@ -136,7 +137,11 @@ private fun Legend() {
     ) {
         Swatch(RECOVERING)
         Spacer(Modifier.width(Space.xs))
-        Text("Recovering", style = MaterialTheme.typography.labelSmall, color = ChalkFaint)
+        Text("Sore", style = MaterialTheme.typography.labelSmall, color = ChalkFaint)
+        Spacer(Modifier.width(Space.md))
+        Swatch(HALFWAY)
+        Spacer(Modifier.width(Space.xs))
+        Text("Halfway", style = MaterialTheme.typography.labelSmall, color = ChalkFaint)
         Spacer(Modifier.width(Space.md))
         Swatch(READY)
         Spacer(Modifier.width(Space.xs))
@@ -150,13 +155,37 @@ private fun Swatch(colour: Color) {
 }
 
 /** Ready to train: deep green, sitting back into the figure. */
-private val READY = lerp(Plate10, Color.Black, 0.30f)
+private val READY = lerp(Plate10, Color.Black, 0.22f)
 
-/** Just trained: the same hue washed pale, so a sore muscle is the thing you see. */
-private val RECOVERING = lerp(Plate10, Color.White, 0.62f)
+/** Halfway: olive, where amber turns towards green. */
+private val HALFWAY = lerp(Plate15, Plate10, 0.55f)
+
+/** Just trained: pale amber, so a sore muscle is the thing the eye lands on. */
+private val RECOVERING = lerp(Plate15, Color.White, 0.42f)
+
+/**
+ * The colour for a muscle at [fraction] recovered.
+ *
+ * Amber to olive to green, rather than one hue fading: a traffic light is a
+ * reading everyone already knows, and the middle of recovery is a real state --
+ * trainable, but not fresh -- that a single fading hue cannot show. Still
+ * light when sore and dark when ready, so the figure is readable even to
+ * someone who cannot separate red from green.
+ */
+private fun shadeFor(fraction: Float): Color {
+    val f = fraction.coerceIn(0f, 1f)
+    return if (f < 0.5f) lerp(RECOVERING, HALFWAY, f * 2f) else lerp(HALFWAY, READY, (f - 0.5f) * 2f)
+}
 
 /** Separating line between muscles, as a fraction of the figure's width. */
 private const val OUTLINE_WIDTH = 0.012f
+
+/**
+ * The untracked body: head, hands, feet and the frame under the muscles. Light
+ * enough to read as a body rather than a hole in the card, dark enough that the
+ * muscles stay the thing being read.
+ */
+private val BODY = lerp(Slate700, Slate600, 0.8f)
 
 /** Width ÷ height of one figure. */
 private const val FIGURE_ASPECT = 0.46f
@@ -280,8 +309,11 @@ private val FRONT = listOf(
     ),
     region(
         MuscleGroup.ABS,
-        // A narrow column between the obliques, tapering towards the navel.
-        Blob(listOf(p(0.445f, 0.288f), p(0.555f, 0.288f), p(0.565f, 0.36f), p(0.535f, 0.44f), p(0.465f, 0.44f), p(0.435f, 0.36f)))
+        // The column down the middle...
+        Blob(listOf(p(0.445f, 0.288f), p(0.555f, 0.288f), p(0.565f, 0.36f), p(0.535f, 0.44f), p(0.465f, 0.44f), p(0.435f, 0.36f))),
+        // ...and the obliques flanking it, which is most of what a waist is.
+        Blob(listOf(p(0.428f, 0.30f), p(0.40f, 0.355f), p(0.412f, 0.425f), p(0.452f, 0.40f), p(0.44f, 0.335f))),
+        Blob(listOf(p(0.572f, 0.30f), p(0.60f, 0.355f), p(0.588f, 0.425f), p(0.548f, 0.40f), p(0.56f, 0.335f)))
     ),
     region(
         MuscleGroup.QUADS,
@@ -294,6 +326,19 @@ private val FRONT = listOf(
         // Full at the top, tapering into the ankle.
         Blob(listOf(p(0.352f, 0.685f), p(0.435f, 0.69f), p(0.425f, 0.78f), p(0.393f, 0.855f), p(0.362f, 0.78f))),
         Blob(listOf(p(0.648f, 0.685f), p(0.565f, 0.69f), p(0.575f, 0.78f), p(0.607f, 0.855f), p(0.638f, 0.78f)))
+    ),
+    region(
+        // The dataset files adductors under the hip musculature, so the inner
+        // thigh is shaded with the glutes rather than left as bare frame.
+        MuscleGroup.GLUTES,
+        Blob(listOf(p(0.462f, 0.49f), p(0.475f, 0.60f), p(0.452f, 0.635f), p(0.432f, 0.56f))),
+        Blob(listOf(p(0.538f, 0.49f), p(0.525f, 0.60f), p(0.548f, 0.635f), p(0.568f, 0.56f)))
+    ),
+    region(
+        // The neck runs into the traps, and leaving it bare left a grey collar
+        // between the head and the shoulders.
+        MuscleGroup.TRAPS,
+        Blob(listOf(p(0.455f, 0.082f), p(0.545f, 0.082f), p(0.555f, 0.125f), p(0.445f, 0.125f)))
     )
 )
 
@@ -345,6 +390,16 @@ private val BACK = listOf(
         MuscleGroup.CALVES,
         Blob(listOf(p(0.352f, 0.685f), p(0.435f, 0.69f), p(0.425f, 0.78f), p(0.393f, 0.855f), p(0.362f, 0.78f))),
         Blob(listOf(p(0.648f, 0.685f), p(0.565f, 0.69f), p(0.575f, 0.78f), p(0.607f, 0.855f), p(0.638f, 0.78f)))
+    ),
+    region(
+        MuscleGroup.TRAPS,
+        Blob(listOf(p(0.455f, 0.082f), p(0.545f, 0.082f), p(0.555f, 0.125f), p(0.445f, 0.125f)))
+    ),
+    region(
+        MuscleGroup.HAMSTRINGS,
+        // The inner head of the hamstring, which the outer shape left bare.
+        Blob(listOf(p(0.462f, 0.545f), p(0.475f, 0.62f), p(0.452f, 0.655f), p(0.435f, 0.58f))),
+        Blob(listOf(p(0.538f, 0.545f), p(0.525f, 0.62f), p(0.548f, 0.655f), p(0.565f, 0.58f)))
     )
 )
 
