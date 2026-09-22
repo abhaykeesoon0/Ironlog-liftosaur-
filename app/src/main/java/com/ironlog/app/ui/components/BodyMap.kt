@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -30,7 +31,9 @@ import androidx.compose.ui.unit.dp
 import com.ironlog.app.data.entity.MuscleGroup
 import com.ironlog.app.ui.theme.ChalkFaint
 import com.ironlog.app.ui.theme.Plate10
+import com.ironlog.app.ui.theme.ChalkDim
 import com.ironlog.app.ui.theme.Plate15
+import com.ironlog.app.ui.theme.Plate25
 import com.ironlog.app.ui.theme.Slate600
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Slate800
@@ -77,20 +80,103 @@ fun BodyMap(
                 .semantics { contentDescription = description },
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Figure(readiness, FRONT, "Front", Modifier.weight(1f))
-            Figure(readiness, BACK, "Back", Modifier.weight(1f))
+            Figure(FRONT, "Front", Modifier.weight(1f)) { shadeFor(readiness[it] ?: 1f) }
+            Figure(BACK, "Back", Modifier.weight(1f)) { shadeFor(readiness[it] ?: 1f) }
         }
         Spacer(Modifier.height(Space.sm))
         Legend()
     }
 }
 
+/**
+ * The same anatomy, shaded by the part a muscle plays in one exercise rather
+ * than by how recovered it is.
+ *
+ * This is the reading an anatomy chart in a gym gives: a body in grey with the
+ * muscles the lift works picked out in colour. The moving figure beside it
+ * shows what the lift *is*; this shows what it is *for*, and the two together
+ * are what a lifter choosing an exercise actually wants to know.
+ */
+@Composable
+fun MuscleHighlight(
+    primary: MuscleGroup?,
+    secondary: Set<MuscleGroup>,
+    modifier: Modifier = Modifier,
+    height: Dp = 260.dp
+) {
+    val description = buildString {
+        append("Muscles worked. ")
+        primary?.let { append("Primary: ${it.label}. ") }
+        if (secondary.isNotEmpty()) append("Also working: " + secondary.joinToString { it.label })
+    }
+
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(height)
+                .semantics { contentDescription = description },
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Figure(FRONT, "Front", Modifier.weight(1f)) { roleShade(it, primary, secondary) }
+            Figure(BACK, "Back", Modifier.weight(1f)) { roleShade(it, primary, secondary) }
+        }
+        Spacer(Modifier.height(Space.sm))
+        WorkedLegend(primary, secondary)
+    }
+}
+
+/**
+ * Red for the muscle doing the work, amber for the ones helping, and a muscle
+ * the lift does not train is left the colour of the body it sits on -- present,
+ * because an anatomy chart missing half its muscles looks broken, but quiet.
+ */
+private fun roleShade(muscle: MuscleGroup, primary: MuscleGroup?, secondary: Set<MuscleGroup>): Color =
+    when {
+        muscle == primary -> WORKED
+        muscle in secondary -> ASSISTING
+        else -> IDLE_MUSCLE
+    }
+
+@Composable
+private fun WorkedLegend(primary: MuscleGroup?, secondary: Set<MuscleGroup>) {
+    Column {
+        primary?.let {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Swatch(WORKED)
+                Spacer(Modifier.width(Space.sm))
+                Text(
+                    "Primary: ${it.label}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ChalkDim
+                )
+            }
+        }
+        // Only the ones the figures can actually show. Cardio and full body have
+        // no shape on the chart, and naming them under a colour that appears
+        // nowhere is a key to an empty legend.
+        val shown = secondary.filter { muscle -> (FRONT + BACK).any { it.muscle == muscle } }
+        if (shown.isNotEmpty()) {
+            Spacer(Modifier.height(Space.xs))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Swatch(ASSISTING)
+                Spacer(Modifier.width(Space.sm))
+                Text(
+                    "Also working: " + shown.joinToString { it.label },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ChalkDim
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun Figure(
-    readiness: Readiness,
     regions: List<Region>,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    colourFor: (MuscleGroup) -> Color
 ) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Canvas(Modifier.fillMaxWidth().weight(1f)) {
@@ -107,11 +193,11 @@ private fun Figure(
             SILHOUETTE.forEach { shape -> drawPath(shape.toPath(::at, figure), BODY) }
 
             regions.forEach { region ->
-                val ready = readiness[region.muscle] ?: 1f
-                val colour = shadeFor(ready)
+                val colour = colourFor(region.muscle)
                 region.shapes.forEach { shape ->
                     val path = shape.toPath(::at, figure)
                     drawPath(path, colour)
+                    striate(path, colour, region.fibre, figure.width)
                     // A hairline in the card's own colour, so two muscles in the
                     // same state stay two muscles instead of merging into one
                     // green mass -- which is most of the figure on a rest day.
@@ -125,6 +211,47 @@ private fun Figure(
         }
         Spacer(Modifier.height(Space.xs))
         Text(label, style = MaterialTheme.typography.labelSmall, color = ChalkFaint)
+    }
+}
+
+/**
+ * Fibre lines inside a muscle, which is most of what separates an anatomy
+ * drawing from a coloured-in outline.
+ *
+ * They run along the muscle's longer axis, because that is the way the fibres
+ * run in nearly every muscle on the chart: across the chest for a pec, down
+ * the arm for a biceps. Drawn in a darker shade of the muscle's own colour and
+ * clipped to its outline, so they read as texture rather than as decoration,
+ * and they never appear on a muscle the exercise does not work.
+ */
+private fun DrawScope.striate(path: Path, colour: Color, fibre: Fibre, figureWidth: Float) {
+    if (colour == IDLE_MUSCLE || colour == BODY) return
+
+    val bounds = path.getBounds()
+    if (bounds.width <= 0f || bounds.height <= 0f) return
+
+    val horizontal = when (fibre) {
+        Fibre.ACROSS -> true
+        Fibre.DOWN -> false
+        Fibre.LONG_AXIS -> bounds.width >= bounds.height
+    }
+
+    val shade = lerp(colour, Color.Black, 0.30f)
+    val width = figureWidth * 0.007f
+    // Five gaps, four lines, whatever the muscle's size: a pec and a calf then
+    // carry the same density of texture rather than the big one looking hatched.
+    val step = (if (horizontal) bounds.height else bounds.width) / 5f
+
+    clipPath(path) {
+        for (i in 1..4) {
+            if (horizontal) {
+                val y = bounds.top + step * i
+                drawLine(shade, Offset(bounds.left, y), Offset(bounds.right, y), strokeWidth = width)
+            } else {
+                val x = bounds.left + step * i
+                drawLine(shade, Offset(x, bounds.top), Offset(x, bounds.bottom), strokeWidth = width)
+            }
+        }
     }
 }
 
@@ -176,6 +303,18 @@ private fun shadeFor(fraction: Float): Color {
     val f = fraction.coerceIn(0f, 1f)
     return if (f < 0.5f) lerp(RECOVERING, HALFWAY, f * 2f) else lerp(HALFWAY, READY, (f - 0.5f) * 2f)
 }
+
+/** The muscle a lift trains hardest. */
+private val WORKED = Plate25
+
+/** The ones helping. Amber rather than a faded red, so the two never blur. */
+private val ASSISTING = Plate15
+
+/**
+ * A muscle this lift does not train: barely lighter than the body, so the
+ * anatomy is still legible without competing with the muscles that matter.
+ */
+private val IDLE_MUSCLE = lerp(Slate600, Color.White, 0.07f)
 
 /** Separating line between muscles, as a fraction of the figure's width. */
 private const val OUTLINE_WIDTH = 0.012f
@@ -233,9 +372,23 @@ private class Oval(val centre: Offset, val rx: Float, val ry: Float) : Shape {
     }
 }
 
-private data class Region(val muscle: MuscleGroup, val shapes: List<Shape>)
+/**
+ * Which way a muscle's fibres run, for the striations drawn inside it.
+ *
+ * Most muscles pull along their own length, so the long axis of the shape is
+ * the right guess. The chest and the glutes are the exceptions that matter
+ * here: both are drawn taller than they are wide, and both pull across.
+ */
+private enum class Fibre { LONG_AXIS, ACROSS, DOWN }
 
-private fun region(muscle: MuscleGroup, vararg shapes: Shape) = Region(muscle, shapes.toList())
+private data class Region(
+    val muscle: MuscleGroup,
+    val shapes: List<Shape>,
+    val fibre: Fibre = Fibre.LONG_AXIS
+)
+
+private fun region(muscle: MuscleGroup, vararg shapes: Shape, fibre: Fibre = Fibre.LONG_AXIS) =
+    Region(muscle, shapes.toList(), fibre)
 
 private fun p(x: Float, y: Float) = Offset(x, y)
 
@@ -294,7 +447,8 @@ private val FRONT = listOf(
         // Pecs: square at the sternum, full and rounded underneath, with a
         // clear split down the middle.
         Blob(listOf(p(0.488f, 0.182f), p(0.488f, 0.272f), p(0.405f, 0.288f), p(0.335f, 0.245f), p(0.352f, 0.186f))),
-        Blob(listOf(p(0.512f, 0.182f), p(0.512f, 0.272f), p(0.595f, 0.288f), p(0.665f, 0.245f), p(0.648f, 0.186f)))
+        Blob(listOf(p(0.512f, 0.182f), p(0.512f, 0.272f), p(0.595f, 0.288f), p(0.665f, 0.245f), p(0.648f, 0.186f))),
+        fibre = Fibre.ACROSS
     ),
     region(
         MuscleGroup.BICEPS,
@@ -313,7 +467,9 @@ private val FRONT = listOf(
         Blob(listOf(p(0.445f, 0.288f), p(0.555f, 0.288f), p(0.565f, 0.36f), p(0.535f, 0.44f), p(0.465f, 0.44f), p(0.435f, 0.36f))),
         // ...and the obliques flanking it, which is most of what a waist is.
         Blob(listOf(p(0.428f, 0.30f), p(0.40f, 0.355f), p(0.412f, 0.425f), p(0.452f, 0.40f), p(0.44f, 0.335f))),
-        Blob(listOf(p(0.572f, 0.30f), p(0.60f, 0.355f), p(0.588f, 0.425f), p(0.548f, 0.40f), p(0.56f, 0.335f)))
+        Blob(listOf(p(0.572f, 0.30f), p(0.60f, 0.355f), p(0.588f, 0.425f), p(0.548f, 0.40f), p(0.56f, 0.335f))),
+        // The rectus abdominis is banded across, not striped down it.
+        fibre = Fibre.ACROSS
     ),
     region(
         MuscleGroup.QUADS,
@@ -379,7 +535,8 @@ private val BACK = listOf(
     region(
         MuscleGroup.GLUTES,
         Blob(listOf(p(0.355f, 0.43f), p(0.49f, 0.435f), p(0.49f, 0.53f), p(0.375f, 0.535f), p(0.325f, 0.485f))),
-        Blob(listOf(p(0.645f, 0.43f), p(0.51f, 0.435f), p(0.51f, 0.53f), p(0.625f, 0.535f), p(0.675f, 0.485f)))
+        Blob(listOf(p(0.645f, 0.43f), p(0.51f, 0.435f), p(0.51f, 0.53f), p(0.625f, 0.535f), p(0.675f, 0.485f))),
+        fibre = Fibre.ACROSS
     ),
     region(
         MuscleGroup.HAMSTRINGS,

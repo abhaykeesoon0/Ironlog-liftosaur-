@@ -63,7 +63,9 @@ fun MovementAnimation(
     /** The muscle the lift trains hardest, marked in red on the figure. */
     primaryMuscle: MuscleGroup? = null,
     /** The ones helping, marked in amber. */
-    secondaryMuscles: Set<MuscleGroup> = emptySet()
+    secondaryMuscles: Set<MuscleGroup> = emptySet(),
+    /** Names the marked muscles underneath. Off where something else names them. */
+    showKey: Boolean = true
 ) {
     val transition = rememberInfiniteTransition(label = pattern.name)
     val phase by transition.animateFloat(
@@ -97,7 +99,7 @@ fun MovementAnimation(
         Text(pattern.label, style = MaterialTheme.typography.titleMedium, color = Chalk)
         Text(pattern.detail, style = MaterialTheme.typography.bodySmall, color = ChalkDim)
 
-        if (primaryMuscle != null || secondaryMuscles.isNotEmpty()) {
+        if (showKey && (primaryMuscle != null || secondaryMuscles.isNotEmpty())) {
             Spacer(Modifier.height(Space.sm))
             MuscleKey(primaryMuscle, secondaryMuscles)
         }
