@@ -69,6 +69,21 @@ class SecureTokenStore @Inject constructor(
     }
 
     /** Clears the session but keeps the signing secret so old tokens stay invalid-checkable. */
+    /**
+     * The user's own Claude API key, for the optional cloud assistant.
+     *
+     * Kept here rather than in DataStore because it is a credential: this file
+     * is encrypted with a key held in the Android keystore, so the API key gets
+     * the same protection as the session tokens beside it.
+     */
+    fun assistantKey(): String? = prefs.getString(KEY_ASSISTANT, null)
+
+    fun saveAssistantKey(value: String?) {
+        prefs.edit().apply {
+            if (value == null) remove(KEY_ASSISTANT) else putString(KEY_ASSISTANT, value)
+        }.apply()
+    }
+
     fun clearSession() {
         prefs.edit()
             .remove(KEY_USER_ID)
@@ -85,5 +100,6 @@ class SecureTokenStore @Inject constructor(
         const val KEY_REFRESH = "refresh_token"
         const val KEY_ACCESS_EXPIRY = "access_expiry"
         const val KEY_SIGNING_SECRET = "signing_secret"
+        const val KEY_ASSISTANT = "assistant_api_key"
     }
 }
