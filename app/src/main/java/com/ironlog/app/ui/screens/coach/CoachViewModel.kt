@@ -3,6 +3,7 @@ package com.ironlog.app.ui.screens.coach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ironlog.app.core.ai.CloudAssistant
+import com.ironlog.app.core.ai.OnDeviceAssistant
 import com.ironlog.app.data.repository.BodyRepository
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.StrengthGoalRepository
@@ -30,6 +31,13 @@ data class CoachMessage(
     val isReferral: Boolean = false
 )
 
+/** Which brain answered, shown so the user knows what they are reading. */
+enum class CoachEngine(val label: String) {
+    RULES("Built-in coach"),
+    ON_DEVICE("Gemini Nano, on this phone"),
+    CLOUD("Claude")
+}
+
 data class CoachUiState(
     val messages: List<CoachMessage> = listOf(
         CoachMessage(
@@ -41,6 +49,7 @@ data class CoachUiState(
     val isThinking: Boolean = false,
     val cloudAvailable: Boolean = false,
     val useCloud: Boolean = false,
+    val onDeviceAvailable: Boolean = false,
     val error: String? = null
 )
 
@@ -50,7 +59,8 @@ class CoachViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val goalRepository: StrengthGoalRepository,
     private val bodyRepository: BodyRepository,
-    private val cloudAssistant: CloudAssistant
+    private val cloudAssistant: CloudAssistant,
+    private val onDeviceAssistant: OnDeviceAssistant
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CoachUiState())
@@ -63,6 +73,13 @@ class CoachViewModel @Inject constructor(
         // The cloud is offered when a key exists, but the offline coach stays
         // the default: it is the one that always works.
         _state.update { it.copy(cloudAvailable = hasKey) }
+
+        viewModelScope.launch {
+            // Only a handful of phones carry Gemini Nano, so this is a question
+            // asked once and answered honestly rather than a feature assumed.
+            val ready = onDeviceAssistant.availability() == OnDeviceAssistant.Availability.READY
+            _state.update { it.copy(onDeviceAvailable = ready) }
+        }
     }
 
     fun setUseCloud(enabled: Boolean) = _state.update { it.copy(useCloud = enabled) }
@@ -81,9 +98,22 @@ class CoachViewModel @Inject constructor(
 
         viewModelScope.launch {
             val context = gatherContext()
+
+            // On-device first when the phone has it: a real model, no network,
+            // nothing leaving the handset. The cloud is only used when the user
+            // has asked for it, and the rules coach catches everything else.
+            if (!_state.value.useCloud && _state.value.onDeviceAvailable) {
+                val onDevice = onDeviceAssistant.ask(clean, describe(context))
+                if (onDevice != null) {
+                    reply(CoachMessage(onDevice, fromUser = false, source = CoachEngine.ON_DEVICE.label))
+                    return@launch
+                }
+                // Fell through: the model was there a moment ago and is not now.
+            }
+
             if (_state.value.useCloud && _state.value.cloudAvailable) {
                 runCatching { cloudAssistant.ask(clean, describe(context)) }
-                    .onSuccess { reply -> reply(CoachMessage(reply, fromUser = false, source = "Claude")) }
+                    .onSuccess { reply -> reply(CoachMessage(reply, fromUser = false, source = CoachEngine.CLOUD.label)) }
                     .onFailure { e ->
                         // Falls back rather than failing: the offline coach can
                         // still answer, which is better than an error bubble.
