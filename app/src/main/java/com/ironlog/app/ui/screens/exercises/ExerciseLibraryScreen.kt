@@ -59,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.height
 import com.ironlog.app.domain.usecase.MovementPattern
 import com.ironlog.app.ui.components.MovementAnimation
+import com.ironlog.app.ui.components.MuscleHighlight
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Chalk
 import com.ironlog.app.ui.theme.ChalkDim
@@ -192,21 +193,33 @@ private fun MovementDemoDialog(exercise: ExerciseEntity, onDismiss: () -> Unit) 
     val pattern = remember(exercise.id) {
         MovementPattern.of(exercise.name, exercise.primaryMuscle, exercise.category)
     }
+    val secondary = remember(exercise.id) {
+        exercise.secondaryMuscles
+            .split(",")
+            .mapNotNull { name -> runCatching { MuscleGroup.valueOf(name.trim()) }.getOrNull() }
+            .toSet()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(exercise.name, color = Chalk) },
         text = {
-            Column {
+            // Scrolls, because the movement, the anatomy and the instructions
+            // together are taller than a dialog on a small phone.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 MovementAnimation(
                     pattern = pattern,
                     primaryMuscle = exercise.primaryMuscle,
-                    secondaryMuscles = exercise.secondaryMuscles
-                        .split(",")
-                        .mapNotNull { name ->
-                            runCatching { MuscleGroup.valueOf(name.trim()) }.getOrNull()
-                        }
-                        .toSet()
+                    secondaryMuscles = secondary,
+                    // Named on the anatomy chart below instead, so the two
+                    // panels do not print the same list twice.
+                    showKey = false
                 )
+                Spacer(Modifier.height(Space.lg))
+                Hairline()
+                Spacer(Modifier.height(Space.md))
+                // What the lift is for, on a body rather than in a sentence.
+                MuscleHighlight(primary = exercise.primaryMuscle, secondary = secondary)
                 if (exercise.instructions.isNotBlank()) {
                     Spacer(Modifier.height(Space.md))
                     Text(
