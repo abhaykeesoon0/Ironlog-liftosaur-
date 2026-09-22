@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,6 +41,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.ui.platform.LocalContext
+import com.ironlog.app.core.sensors.HealthConnectSteps
+import com.ironlog.app.data.entity.StepSource
 import com.ironlog.app.core.permissions.AppPermission
 import com.ironlog.app.core.permissions.rememberPermissionState
 import com.ironlog.app.data.entity.PlateSet
@@ -100,11 +105,27 @@ fun HomeScreen(
     questsViewModel: QuestsViewModel = hiltViewModel(),
     equippedViewModel: EquippedViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val goals by goalsViewModel.goals.collectAsStateWithLifecycle()
     val quests by questsViewModel.state.collectAsStateWithLifecycle()
     val equipped by equippedViewModel.equipped.collectAsStateWithLifecycle()
     val stepsPermission = rememberPermissionState(AppPermission.ACTIVITY_RECOGNITION)
+
+    // Health Connect runs its own permission screen rather than the system
+    // dialog, so it is launched through its contract instead of the app's
+    // permission helper.
+    val healthConnect = remember(context) { HealthConnectSteps(context) }
+    val healthConnectRequest = rememberLauncherForActivityResult(
+        contract = healthConnect.permissionContract()
+    ) { _: Set<String> -> viewModel.refreshHealthConnectSteps() }
+
+    // A watch syncs in batches, so the figure is refreshed whenever Home
+    // returns to the foreground rather than being subscribed to.
+    LifecycleStartEffect(state.stepSource) {
+        if (state.stepSource == StepSource.HEALTH_CONNECT) viewModel.refreshHealthConnectSteps()
+        onStopOrDispose { }
+    }
     val stepsEnabled = state.stepSensorAvailable && stepsPermission.isGranted
 
     // The pedometer is only read while Home is on screen; the hardware keeps
@@ -195,10 +216,21 @@ fun HomeScreen(
         SectionHeader("Today")
         IronCard {
             Column {
+                val fromWatch = state.stepSource == StepSource.HEALTH_CONNECT
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = ChalkDim, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(Space.sm))
                     when {
+                        fromWatch && state.healthConnectReady -> Text(
+                            "%,d steps".format(state.todaySteps),
+                            style = NumericType.stat,
+                            color = Chalk
+                        )
+                        fromWatch -> Text(
+                            "Not connected yet",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = ChalkDim
+                        )
                         !state.stepSensorAvailable -> Text(
                             "This phone has no step counter",
                             style = MaterialTheme.typography.bodyLarge,
@@ -213,8 +245,18 @@ fun HomeScreen(
                     }
                 }
                 Spacer(Modifier.height(Space.xs))
-                Caption("From your phone's built-in step counter")
-                if (state.stepSensorAvailable && !stepsPermission.isGranted) {
+                Caption(
+                    if (fromWatch) "From Health Connect, including your watch"
+                    else "From your phone's built-in step counter"
+                )
+
+                if (fromWatch && !state.healthConnectReady) {
+                    Spacer(Modifier.height(Space.md))
+                    SecondaryButton(
+                        text = "Connect Health Connect",
+                        onClick = { healthConnectRequest.launch(viewModel.healthConnectPermissions()) }
+                    )
+                } else if (!fromWatch && state.stepSensorAvailable && !stepsPermission.isGranted) {
                     Spacer(Modifier.height(Space.md))
                     SecondaryButton(
                         text = "Count my steps",

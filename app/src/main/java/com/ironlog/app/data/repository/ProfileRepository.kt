@@ -18,6 +18,7 @@ import com.ironlog.app.data.dao.ExerciseDao
 import com.ironlog.app.data.dao.UserDao
 import com.ironlog.app.domain.usecase.TrainingMath
 import com.ironlog.app.data.entity.PlateSet
+import com.ironlog.app.data.entity.StepSource
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.UserEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -30,6 +31,13 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Marks an avatar value as one of the app's built-in figures rather than a
+ * photo on disk. Kept here so the repository can tell the two apart without
+ * depending on the UI layer that draws them.
+ */
+const val FIGURE_AVATAR_PREFIX = "figure:"
 
 data class ReminderSettings(
     val enabled: Boolean = false,
@@ -69,6 +77,9 @@ interface ProfileRepository {
     /** Which plates and bar the gym has, used by the plate calculator. */
     val equipment: Flow<EquipmentSettings>
 
+    /** Where today's steps are read from: this phone, or Health Connect. */
+    val stepSource: Flow<StepSource>
+
     suspend fun updateProfile(name: String, bodyweightKg: Double?, heightCm: Double?): Result<Unit>
     suspend fun setUnitSystem(unit: UnitSystem): Result<Unit>
     suspend fun setBiometricLock(enabled: Boolean): Result<Unit>
@@ -78,6 +89,7 @@ interface ProfileRepository {
     suspend fun setReminder(settings: ReminderSettings): Result<Unit>
     suspend fun setWelcomeSound(enabled: Boolean): Result<Unit>
     suspend fun setPlateSet(plateSet: PlateSet): Result<Unit>
+    suspend fun setStepSource(source: StepSource): Result<Unit>
     suspend fun setBarWeight(barWeightKg: Double): Result<Unit>
 
     /** Requires the password again: deletion is irreversible and wipes every row the user owns. */
@@ -122,6 +134,12 @@ class ProfileRepositoryImpl @Inject constructor(
             // racks does not leave a 20 kg bar sitting under pound plates.
             barWeightKg = prefs[KEY_BAR_WEIGHT] ?: TrainingMath.defaultBarKg(set)
         )
+    }
+
+    override val stepSource: Flow<StepSource> = dataStore.data.map { prefs ->
+        prefs[KEY_STEP_SOURCE]
+            ?.let { runCatching { StepSource.valueOf(it) }.getOrNull() }
+            ?: StepSource.PHONE
     }
 
     override suspend fun updateProfile(name: String, bodyweightKg: Double?, heightCm: Double?): Result<Unit> =
@@ -173,7 +191,12 @@ class ProfileRepositoryImpl @Inject constructor(
     }
 
     override suspend fun setAvatar(path: String?): Result<Unit> = updateUser { user ->
-        user.avatarPath?.takeIf { it != path }?.let { photoStore.delete(it) }
+        // Only a real photo has a file behind it; a built-in figure is a token,
+        // and handing that to the file store would be a delete on a path that
+        // never existed.
+        user.avatarPath
+            ?.takeIf { it != path && !it.startsWith(FIGURE_AVATAR_PREFIX) }
+            ?.let { photoStore.delete(it) }
         user.copy(avatarPath = path)
     }
 
@@ -208,6 +231,13 @@ class ProfileRepositoryImpl @Inject constructor(
                 // leaving the old number would quietly misreport every total.
                 prefs[KEY_BAR_WEIGHT] = TrainingMath.defaultBarKg(plateSet)
             }
+            Unit
+        }
+    }
+
+    override suspend fun setStepSource(source: StepSource): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            dataStore.edit { prefs -> prefs[KEY_STEP_SOURCE] = source.name }
             Unit
         }
     }
@@ -262,6 +292,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_REMINDER_MINUTE = intPreferencesKey("reminder_minute")
         val KEY_WELCOME_SOUND = booleanPreferencesKey("welcome_sound_enabled")
         val KEY_PLATE_SET = stringPreferencesKey("plate_set")
+        val KEY_STEP_SOURCE = stringPreferencesKey("step_source")
         val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")
 
     }

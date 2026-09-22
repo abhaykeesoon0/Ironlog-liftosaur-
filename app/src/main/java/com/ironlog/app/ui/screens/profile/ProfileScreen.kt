@@ -63,6 +63,11 @@ import com.ironlog.app.ui.components.SectionHeader
 import com.ironlog.app.ui.components.StatTile
 import com.ironlog.app.ui.format.formatLength
 import com.ironlog.app.ui.format.formatWeight
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.AlertDialog
+import com.ironlog.app.ui.components.AvatarContent
+import com.ironlog.app.ui.components.FigureAvatars
 import com.ironlog.app.ui.theme.Chalk
 import com.ironlog.app.ui.theme.ChalkDim
 import com.ironlog.app.ui.theme.ChalkFaint
@@ -82,6 +87,7 @@ fun ProfileScreen(
     val data by viewModel.data.collectAsStateWithLifecycle()
     val form by viewModel.form.collectAsStateWithLifecycle()
     var confirmSignOut by remember { mutableStateOf(false) }
+    var choosingAvatar by remember { mutableStateOf(false) }
 
     val camera = rememberPermissionState(AppPermission.CAMERA)
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
@@ -105,11 +111,7 @@ fun ProfileScreen(
                 path = user?.avatarPath,
                 name = user?.displayName.orEmpty(),
                 busy = form.isAvatarBusy,
-                onClick = {
-                    camera.runWithPermission {
-                        viewModel.prepareAvatarCapture()?.let { takePicture.launch(it) }
-                    }
-                }
+                onClick = { choosingAvatar = true }
             )
             Spacer(Modifier.width(Space.lg))
             Column(Modifier.weight(1f)) {
@@ -121,7 +123,11 @@ fun ProfileScreen(
                 Text(user?.email.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = ChalkDim)
                 if (user?.avatarPath != null) {
                     TextButton(onClick = viewModel::removeAvatar, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                        Text("Remove photo", color = ChalkFaint, style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            if (FigureAvatars.isFigure(user.avatarPath)) "Remove avatar" else "Remove photo",
+                            color = ChalkFaint,
+                            style = MaterialTheme.typography.labelMedium
+                        )
                     }
                 }
             }
@@ -202,6 +208,22 @@ fun ProfileScreen(
         Spacer(Modifier.height(Space.section))
     }
 
+    if (choosingAvatar) {
+        AvatarChooser(
+            onTakePhoto = {
+                choosingAvatar = false
+                camera.runWithPermission {
+                    viewModel.prepareAvatarCapture()?.let { takePicture.launch(it) }
+                }
+            },
+            onPickFigure = { value ->
+                choosingAvatar = false
+                viewModel.chooseFigureAvatar(value)
+            },
+            onDismiss = { choosingAvatar = false }
+        )
+    }
+
     if (confirmSignOut) {
         ConfirmDialog(
             title = "Sign out?",
@@ -216,6 +238,60 @@ fun ProfileScreen(
     }
 }
 
+/**
+ * Photo or figure.
+ *
+ * Offered as a choice rather than sending everyone to the camera: a gym is a
+ * place plenty of people would rather not photograph themselves in, and an
+ * avatar they picked is still theirs.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AvatarChooser(
+    onTakePhoto: () -> Unit,
+    onPickFigure: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Your picture", color = Chalk) },
+        text = {
+            Column {
+                Text(
+                    "Take a photo, or pick a figure. Photos stay in the app's private storage on this phone.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ChalkDim
+                )
+                Spacer(Modifier.height(Space.md))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Space.md),
+                    verticalArrangement = Arrangement.spacedBy(Space.md)
+                ) {
+                    FigureAvatars.ALL.forEach { figure ->
+                        Box(
+                            Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .clickable(
+                                    role = Role.Button,
+                                    onClickLabel = figure.label,
+                                    onClick = { onPickFigure(FigureAvatars.valueFor(figure)) }
+                                )
+                        ) {
+                            AvatarContent(FigureAvatars.valueFor(figure))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onTakePhoto) { Text("Take a photo", color = Chalk) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = ChalkDim) } },
+        containerColor = Slate700
+    )
+}
+
 @Composable
 private fun Avatar(path: String?, name: String, busy: Boolean, onClick: () -> Unit) {
     Box(
@@ -228,12 +304,7 @@ private fun Avatar(path: String?, name: String, busy: Boolean, onClick: () -> Un
     ) {
         when {
             busy -> CircularProgressIndicator(Modifier.size(24.dp), color = ChalkDim, strokeWidth = 2.dp)
-            path != null -> AsyncImage(
-                model = File(path),
-                contentDescription = "Profile photo",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            path != null -> AvatarContent(path)
             name.isNotBlank() -> Text(
                 initials(name),
                 style = MaterialTheme.typography.headlineMedium,

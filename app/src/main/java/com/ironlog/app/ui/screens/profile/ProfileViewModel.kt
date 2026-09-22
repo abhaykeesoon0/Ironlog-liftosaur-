@@ -137,6 +137,15 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    /** Picks one of the app's built-in figures instead of a photo. */
+    fun chooseFigureAvatar(value: String) {
+        viewModelScope.launch {
+            profileRepository.setAvatar(value).onFailure { e ->
+                _form.update { it.copy(error = e.userMessage("Could not set that avatar")) }
+            }
+        }
+    }
+
     fun removeAvatar() {
         viewModelScope.launch {
             profileRepository.setAvatar(null).onFailure { e ->

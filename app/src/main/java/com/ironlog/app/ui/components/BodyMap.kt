@@ -217,119 +217,134 @@ private fun p(x: Float, y: Float) = Offset(x, y)
  * the coloured parts sit on a body rather than floating.
  */
 private val SILHOUETTE = listOf(
-    Oval(p(0.50f, 0.055f), 0.085f, 0.048f),                    // head
-    Limb(p(0.50f, 0.085f), p(0.50f, 0.115f), 0.045f),          // neck
-    // Torso: wide at the shoulders, in at the waist, out again at the hips.
+    Oval(p(0.50f, 0.050f), 0.070f, 0.042f),                    // head
+    // Short, thick neck running into the traps, as a trained figure has.
+    Limb(p(0.50f, 0.078f), p(0.50f, 0.112f), 0.052f),
+    // Torso: a V. Wide across the deltoids, drawn in hard at the waist, out
+    // again across the hips. The taper is what makes a figure read as trained
+    // rather than as a gingerbread man.
     Blob(
         listOf(
-            p(0.28f, 0.155f), p(0.72f, 0.155f), p(0.70f, 0.26f),
-            p(0.64f, 0.36f), p(0.66f, 0.44f), p(0.34f, 0.44f),
-            p(0.36f, 0.36f), p(0.30f, 0.26f)
+            p(0.22f, 0.175f), p(0.32f, 0.140f), p(0.50f, 0.128f), p(0.68f, 0.140f),
+            p(0.78f, 0.175f), p(0.74f, 0.255f), p(0.655f, 0.355f), p(0.675f, 0.435f),
+            p(0.60f, 0.475f), p(0.40f, 0.475f), p(0.325f, 0.435f), p(0.345f, 0.355f),
+            p(0.26f, 0.255f)
         )
     ),
-    Limb(p(0.30f, 0.17f), p(0.20f, 0.34f), 0.055f),            // left upper arm
-    Limb(p(0.70f, 0.17f), p(0.80f, 0.34f), 0.055f),            // right upper arm
-    Limb(p(0.20f, 0.34f), p(0.15f, 0.49f), 0.045f),            // left forearm
-    Limb(p(0.80f, 0.34f), p(0.85f, 0.49f), 0.045f),            // right forearm
-    Oval(p(0.135f, 0.525f), 0.045f, 0.022f),                   // left hand
-    Oval(p(0.865f, 0.525f), 0.045f, 0.022f),                   // right hand
-    Limb(p(0.41f, 0.44f), p(0.40f, 0.68f), 0.085f),            // left thigh
-    Limb(p(0.59f, 0.44f), p(0.60f, 0.68f), 0.085f),            // right thigh
-    Limb(p(0.40f, 0.68f), p(0.40f, 0.90f), 0.055f),            // left shin
-    Limb(p(0.60f, 0.68f), p(0.60f, 0.90f), 0.055f),            // right shin
-    Oval(p(0.385f, 0.925f), 0.055f, 0.022f),                   // left foot
-    Oval(p(0.615f, 0.925f), 0.055f, 0.022f)                    // right foot
+    // Arms hang slightly away from the body, as they do over a built back.
+    Limb(p(0.265f, 0.185f), p(0.185f, 0.345f), 0.066f),        // left upper arm
+    Limb(p(0.735f, 0.185f), p(0.815f, 0.345f), 0.066f),        // right upper arm
+    Limb(p(0.185f, 0.345f), p(0.135f, 0.50f), 0.052f),         // left forearm
+    Limb(p(0.815f, 0.345f), p(0.865f, 0.50f), 0.052f),         // right forearm
+    Oval(p(0.125f, 0.535f), 0.042f, 0.024f),                   // left hand
+    Oval(p(0.875f, 0.535f), 0.042f, 0.024f),                   // right hand
+    // Thighs thick at the hip, tapering into the knee.
+    Limb(p(0.415f, 0.465f), p(0.395f, 0.665f), 0.098f),        // left thigh
+    Limb(p(0.585f, 0.465f), p(0.605f, 0.665f), 0.098f),        // right thigh
+    Limb(p(0.395f, 0.665f), p(0.385f, 0.885f), 0.062f),        // left shin
+    Limb(p(0.605f, 0.665f), p(0.615f, 0.885f), 0.062f),        // right shin
+    Oval(p(0.375f, 0.920f), 0.052f, 0.022f),                   // left foot
+    Oval(p(0.625f, 0.920f), 0.052f, 0.022f)                    // right foot
 )
 
 private val FRONT = listOf(
     region(
         MuscleGroup.TRAPS,
-        Blob(listOf(p(0.44f, 0.118f), p(0.56f, 0.118f), p(0.645f, 0.172f), p(0.355f, 0.172f)))
+        // Sloping from the neck onto each shoulder.
+        Blob(listOf(p(0.50f, 0.108f), p(0.615f, 0.152f), p(0.66f, 0.178f), p(0.50f, 0.168f))),
+        Blob(listOf(p(0.50f, 0.108f), p(0.385f, 0.152f), p(0.34f, 0.178f), p(0.50f, 0.168f)))
     ),
     region(
         MuscleGroup.SHOULDERS,
-        Oval(p(0.305f, 0.175f), 0.075f, 0.035f),
-        Oval(p(0.695f, 0.175f), 0.075f, 0.035f)
+        // Deltoid caps, rounded over the top of the arm.
+        Blob(listOf(p(0.32f, 0.142f), p(0.245f, 0.165f), p(0.225f, 0.235f), p(0.30f, 0.245f), p(0.345f, 0.192f))),
+        Blob(listOf(p(0.68f, 0.142f), p(0.755f, 0.165f), p(0.775f, 0.235f), p(0.70f, 0.245f), p(0.655f, 0.192f)))
     ),
     region(
         MuscleGroup.CHEST,
-        // Pecs: square at the sternum, rounded under, tapering to the armpit.
-        Blob(listOf(p(0.482f, 0.192f), p(0.478f, 0.258f), p(0.385f, 0.268f), p(0.338f, 0.222f), p(0.385f, 0.192f))),
-        Blob(listOf(p(0.518f, 0.192f), p(0.522f, 0.258f), p(0.615f, 0.268f), p(0.662f, 0.222f), p(0.615f, 0.192f)))
+        // Pecs: square at the sternum, full and rounded underneath, with a
+        // clear split down the middle.
+        Blob(listOf(p(0.488f, 0.182f), p(0.488f, 0.272f), p(0.405f, 0.288f), p(0.335f, 0.245f), p(0.352f, 0.186f))),
+        Blob(listOf(p(0.512f, 0.182f), p(0.512f, 0.272f), p(0.595f, 0.288f), p(0.665f, 0.245f), p(0.648f, 0.186f)))
     ),
     region(
         MuscleGroup.BICEPS,
-        Limb(p(0.285f, 0.205f), p(0.215f, 0.315f), 0.042f),
-        Limb(p(0.715f, 0.205f), p(0.785f, 0.315f), 0.042f)
+        // A peak rather than a bar: thick at the middle, tapering at both ends.
+        Blob(listOf(p(0.295f, 0.205f), p(0.245f, 0.245f), p(0.215f, 0.315f), p(0.255f, 0.335f), p(0.30f, 0.265f))),
+        Blob(listOf(p(0.705f, 0.205f), p(0.755f, 0.245f), p(0.785f, 0.315f), p(0.745f, 0.335f), p(0.70f, 0.265f)))
     ),
     region(
         MuscleGroup.FOREARMS,
-        Limb(p(0.20f, 0.345f), p(0.155f, 0.475f), 0.035f),
-        Limb(p(0.80f, 0.345f), p(0.845f, 0.475f), 0.035f)
+        Blob(listOf(p(0.215f, 0.352f), p(0.165f, 0.40f), p(0.148f, 0.478f), p(0.185f, 0.485f), p(0.225f, 0.40f))),
+        Blob(listOf(p(0.785f, 0.352f), p(0.835f, 0.40f), p(0.852f, 0.478f), p(0.815f, 0.485f), p(0.775f, 0.40f)))
     ),
     region(
         MuscleGroup.ABS,
-        Blob(listOf(p(0.44f, 0.265f), p(0.56f, 0.265f), p(0.575f, 0.35f), p(0.55f, 0.415f), p(0.45f, 0.415f), p(0.425f, 0.35f)))
+        // A narrow column between the obliques, tapering towards the navel.
+        Blob(listOf(p(0.445f, 0.288f), p(0.555f, 0.288f), p(0.565f, 0.36f), p(0.535f, 0.44f), p(0.465f, 0.44f), p(0.435f, 0.36f)))
     ),
     region(
         MuscleGroup.QUADS,
-        // Teardrops: full at the hip, narrowing just above the knee.
-        Blob(listOf(p(0.355f, 0.455f), p(0.455f, 0.455f), p(0.445f, 0.60f), p(0.415f, 0.665f), p(0.375f, 0.62f))),
-        Blob(listOf(p(0.645f, 0.455f), p(0.545f, 0.455f), p(0.555f, 0.60f), p(0.585f, 0.665f), p(0.625f, 0.62f)))
+        // The sweep: widest on the outside of the thigh, narrowing to the knee.
+        Blob(listOf(p(0.345f, 0.485f), p(0.455f, 0.49f), p(0.44f, 0.60f), p(0.405f, 0.655f), p(0.355f, 0.60f), p(0.325f, 0.53f))),
+        Blob(listOf(p(0.655f, 0.485f), p(0.545f, 0.49f), p(0.56f, 0.60f), p(0.595f, 0.655f), p(0.645f, 0.60f), p(0.675f, 0.53f)))
     ),
     region(
         MuscleGroup.CALVES,
-        Blob(listOf(p(0.36f, 0.70f), p(0.44f, 0.70f), p(0.43f, 0.80f), p(0.40f, 0.85f), p(0.37f, 0.80f))),
-        Blob(listOf(p(0.64f, 0.70f), p(0.56f, 0.70f), p(0.57f, 0.80f), p(0.60f, 0.85f), p(0.63f, 0.80f)))
+        // Full at the top, tapering into the ankle.
+        Blob(listOf(p(0.352f, 0.685f), p(0.435f, 0.69f), p(0.425f, 0.78f), p(0.393f, 0.855f), p(0.362f, 0.78f))),
+        Blob(listOf(p(0.648f, 0.685f), p(0.565f, 0.69f), p(0.575f, 0.78f), p(0.607f, 0.855f), p(0.638f, 0.78f)))
     )
 )
 
 private val BACK = listOf(
     region(
         MuscleGroup.TRAPS,
-        // The kite shape between the neck, the shoulders and the mid-back.
-        Blob(listOf(p(0.50f, 0.118f), p(0.625f, 0.172f), p(0.545f, 0.245f), p(0.50f, 0.27f), p(0.455f, 0.245f), p(0.375f, 0.172f)))
+        // The diamond between the neck, the shoulders and the mid-back.
+        Blob(listOf(p(0.50f, 0.112f), p(0.645f, 0.165f), p(0.565f, 0.245f), p(0.50f, 0.27f), p(0.435f, 0.245f), p(0.355f, 0.165f)))
     ),
     region(
         MuscleGroup.SHOULDERS,
-        Oval(p(0.305f, 0.175f), 0.075f, 0.035f),
-        Oval(p(0.695f, 0.175f), 0.075f, 0.035f)
+        Blob(listOf(p(0.32f, 0.142f), p(0.245f, 0.165f), p(0.225f, 0.235f), p(0.30f, 0.245f), p(0.345f, 0.192f))),
+        Blob(listOf(p(0.68f, 0.142f), p(0.755f, 0.165f), p(0.775f, 0.235f), p(0.70f, 0.245f), p(0.655f, 0.192f)))
     ),
     region(
         MuscleGroup.LATS,
-        // Wings: wide under the armpit, tapering into the waist.
-        Blob(listOf(p(0.335f, 0.195f), p(0.462f, 0.285f), p(0.448f, 0.385f), p(0.352f, 0.335f), p(0.312f, 0.255f))),
-        Blob(listOf(p(0.665f, 0.195f), p(0.538f, 0.285f), p(0.552f, 0.385f), p(0.648f, 0.335f), p(0.688f, 0.255f)))
+        // Wings: wide under the armpit, sweeping down into the waist. These are
+        // what give the back its V, so they are drawn generously.
+        Blob(listOf(p(0.315f, 0.195f), p(0.455f, 0.29f), p(0.44f, 0.40f), p(0.365f, 0.375f), p(0.29f, 0.29f))),
+        Blob(listOf(p(0.685f, 0.195f), p(0.545f, 0.29f), p(0.56f, 0.40f), p(0.635f, 0.375f), p(0.71f, 0.29f)))
     ),
     region(
         MuscleGroup.BACK,
         // The spinal column between the lats, down to the waist.
-        Blob(listOf(p(0.465f, 0.305f), p(0.535f, 0.305f), p(0.55f, 0.40f), p(0.50f, 0.43f), p(0.45f, 0.40f)))
+        Blob(listOf(p(0.468f, 0.285f), p(0.532f, 0.285f), p(0.548f, 0.39f), p(0.50f, 0.425f), p(0.452f, 0.39f)))
     ),
     region(
         MuscleGroup.TRICEPS,
-        Limb(p(0.295f, 0.20f), p(0.225f, 0.325f), 0.042f),
-        Limb(p(0.705f, 0.20f), p(0.775f, 0.325f), 0.042f)
+        // The horseshoe: thick at the shoulder, tapering to the elbow.
+        Blob(listOf(p(0.30f, 0.20f), p(0.245f, 0.245f), p(0.222f, 0.325f), p(0.262f, 0.34f), p(0.305f, 0.26f))),
+        Blob(listOf(p(0.70f, 0.20f), p(0.755f, 0.245f), p(0.778f, 0.325f), p(0.738f, 0.34f), p(0.695f, 0.26f)))
     ),
     region(
         MuscleGroup.FOREARMS,
-        Limb(p(0.20f, 0.345f), p(0.155f, 0.475f), 0.035f),
-        Limb(p(0.80f, 0.345f), p(0.845f, 0.475f), 0.035f)
+        Blob(listOf(p(0.215f, 0.352f), p(0.165f, 0.40f), p(0.148f, 0.478f), p(0.185f, 0.485f), p(0.225f, 0.40f))),
+        Blob(listOf(p(0.785f, 0.352f), p(0.835f, 0.40f), p(0.852f, 0.478f), p(0.815f, 0.485f), p(0.775f, 0.40f)))
     ),
     region(
         MuscleGroup.GLUTES,
-        Blob(listOf(p(0.36f, 0.435f), p(0.49f, 0.44f), p(0.49f, 0.52f), p(0.38f, 0.525f), p(0.335f, 0.48f))),
-        Blob(listOf(p(0.64f, 0.435f), p(0.51f, 0.44f), p(0.51f, 0.52f), p(0.62f, 0.525f), p(0.665f, 0.48f)))
+        Blob(listOf(p(0.355f, 0.43f), p(0.49f, 0.435f), p(0.49f, 0.53f), p(0.375f, 0.535f), p(0.325f, 0.485f))),
+        Blob(listOf(p(0.645f, 0.43f), p(0.51f, 0.435f), p(0.51f, 0.53f), p(0.625f, 0.535f), p(0.675f, 0.485f)))
     ),
     region(
         MuscleGroup.HAMSTRINGS,
-        Blob(listOf(p(0.365f, 0.535f), p(0.445f, 0.535f), p(0.44f, 0.63f), p(0.405f, 0.665f), p(0.37f, 0.62f))),
-        Blob(listOf(p(0.635f, 0.535f), p(0.555f, 0.535f), p(0.56f, 0.63f), p(0.595f, 0.665f), p(0.63f, 0.62f)))
+        Blob(listOf(p(0.355f, 0.545f), p(0.445f, 0.55f), p(0.435f, 0.63f), p(0.40f, 0.66f), p(0.355f, 0.62f))),
+        Blob(listOf(p(0.645f, 0.545f), p(0.555f, 0.55f), p(0.565f, 0.63f), p(0.60f, 0.66f), p(0.645f, 0.62f)))
     ),
     region(
         MuscleGroup.CALVES,
-        Blob(listOf(p(0.36f, 0.70f), p(0.44f, 0.70f), p(0.43f, 0.80f), p(0.40f, 0.85f), p(0.37f, 0.80f))),
-        Blob(listOf(p(0.64f, 0.70f), p(0.56f, 0.70f), p(0.57f, 0.80f), p(0.60f, 0.85f), p(0.63f, 0.80f)))
+        Blob(listOf(p(0.352f, 0.685f), p(0.435f, 0.69f), p(0.425f, 0.78f), p(0.393f, 0.855f), p(0.362f, 0.78f))),
+        Blob(listOf(p(0.648f, 0.685f), p(0.565f, 0.69f), p(0.575f, 0.78f), p(0.607f, 0.855f), p(0.638f, 0.78f)))
     )
 )
 

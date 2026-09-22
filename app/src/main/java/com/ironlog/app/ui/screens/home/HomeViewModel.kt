@@ -2,8 +2,10 @@ package com.ironlog.app.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ironlog.app.core.sensors.HealthConnectSteps
 import com.ironlog.app.core.sensors.StepCounter
 import com.ironlog.app.data.dao.RecordWithExercise
+import com.ironlog.app.data.entity.StepSource
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.repository.BodyRepository
@@ -44,6 +46,9 @@ data class HomeUiState(
     val volumeThisWeekKg: Double = 0.0,
     val streakWeeks: Int = 0,
     val stepSensorAvailable: Boolean = false,
+    val stepSource: StepSource = StepSource.PHONE,
+    /** Health Connect is installed and has given us the steps permission. */
+    val healthConnectReady: Boolean = false,
     val todaySteps: Int = 0,
     val lastWorkout: WorkoutEntity? = null,
     val recentBlock: TrainingMath.BlockSummary = TrainingMath.BlockSummary(),
@@ -61,7 +66,8 @@ class HomeViewModel @Inject constructor(
     private val cardioRepository: CardioRepository,
     private val bodyRepository: BodyRepository,
     private val goalRepository: StrengthGoalRepository,
-    private val stepCounter: StepCounter
+    private val stepCounter: StepCounter,
+    private val healthConnectSteps: HealthConnectSteps
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -153,6 +159,15 @@ class HomeViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            profileRepository.stepSource
+                .catch { e -> _state.update { it.copy(error = e.userMessage("Could not read your step settings")) } }
+                .collect { source ->
+                    _state.update { it.copy(stepSource = source) }
+                    if (source == StepSource.HEALTH_CONNECT) refreshHealthConnectSteps()
+                }
+        }
+
+        viewModelScope.launch {
             profileRepository.equipment
                 .catch { e -> _state.update { it.copy(error = e.userMessage("Could not load your equipment settings")) } }
                 .collect { equipment -> _state.update { it.copy(equipment = equipment) } }
@@ -179,10 +194,37 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
+     * Pulls today's total from Health Connect.
+     *
+     * A read rather than a subscription: Health Connect has no change stream,
+     * and a watch syncs in batches anyway, so polling when the screen appears
+     * is both simpler and closer to how the data actually arrives.
+     */
+    fun refreshHealthConnectSteps() {
+        viewModelScope.launch {
+            val granted = healthConnectSteps.hasPermission()
+            val steps = if (granted) healthConnectSteps.stepsToday() else null
+            _state.update {
+                it.copy(
+                    healthConnectReady = granted,
+                    // Keep the last good figure if this read failed: a blank
+                    // where a number was is read as "you did nothing today".
+                    todaySteps = steps?.toInt() ?: it.todaySteps
+                )
+            }
+        }
+    }
+
+    fun healthConnectAvailability() = healthConnectSteps.availability()
+
+    fun healthConnectPermissions() = healthConnectSteps.permissions
+
+    /**
      * Listens to the pedometer while the screen is started. Idempotent, so the
      * permission callback and the lifecycle effect can both call it safely.
      */
     fun startSteps() {
+        if (_state.value.stepSource != StepSource.PHONE) return
         if (!stepCounter.isAvailable() || stepJob?.isActive == true) return
         stepJob = viewModelScope.launch {
             stepCounter.rawCounts()

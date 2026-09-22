@@ -12,6 +12,7 @@ import com.ironlog.app.data.repository.ExportKind
 import com.ironlog.app.data.repository.ExportRepository
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.entity.PlateSet
+import com.ironlog.app.data.entity.StepSource
 import com.ironlog.app.data.repository.EquipmentSettings
 import com.ironlog.app.data.repository.ReminderSettings
 import com.ironlog.app.domain.usecase.TrainingMath
@@ -52,6 +53,9 @@ class SettingsViewModel @Inject constructor(
     val equipment: StateFlow<EquipmentSettings> = profileRepository.equipment
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EquipmentSettings())
 
+    val stepSource: StateFlow<StepSource> = profileRepository.stepSource
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StepSource.PHONE)
+
     val welcomeSound: StateFlow<Boolean> = profileRepository.welcomeSoundEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
@@ -78,6 +82,9 @@ class SettingsViewModel @Inject constructor(
         val next = (u.weeklyGoalWorkouts + delta).coerceIn(1, 14)
         persist("Could not update the goal") { profileRepository.setWeeklyGoal(next) }
     }
+
+    fun setStepSource(source: StepSource) =
+        persist("Could not change the step source") { profileRepository.setStepSource(source) }
 
     fun setPlateSet(plateSet: PlateSet) =
         persist("Could not change the plate set") { profileRepository.setPlateSet(plateSet) }
