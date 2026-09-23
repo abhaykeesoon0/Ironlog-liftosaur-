@@ -19,6 +19,7 @@ object StoreCatalogue {
     enum class Category(val label: String, val blurb: String) {
         BACKGROUND("Backgrounds", "All dark. The app stays readable in a badly lit gym."),
         BADGE("Badges", "An emblem beside your name."),
+        TITLE("Titles", "A line under your name on Home."),
         WIDGET("Widgets", "Extra cards on Home. Convenience only, never anything you need.")
     }
 
@@ -40,12 +41,25 @@ object StoreCatalogue {
         Item("bg_navy", "Deep navy", "Blue-black, easy at night.", 200, Category.BACKGROUND),
         Item("bg_ink", "Near black", "Darkest of the set. Kind to an OLED battery.", 250, Category.BACKGROUND),
         Item("bg_plum", "Dark plum", "A warm shadow of purple.", 300, Category.BACKGROUND),
+        Item("bg_forest", "Forest", "Green-black, like a gym with the lights down.", 350, Category.BACKGROUND),
+        Item("bg_oxblood", "Oxblood", "The darkest red there is.", 400, Category.BACKGROUND),
+        Item("bg_midnight", "Midnight", "Blue so deep it is nearly black.", 450, Category.BACKGROUND),
 
         // --------------------------------------------------------------- badges
         Item("badge_dumbbell", "Dumbbell", "The standard issue.", 100, Category.BADGE),
         Item("badge_flame", "Flame", "For a streak worth showing.", 200, Category.BADGE),
         Item("badge_bolt", "Bolt", "Fast work.", 250, Category.BADGE),
         Item("badge_crown", "Crown", "The expensive one.", 500, Category.BADGE),
+        Item("badge_star", "Star", "Earned, not given.", 150, Category.BADGE),
+        Item("badge_shield", "Shield", "For the consistent.", 300, Category.BADGE),
+        Item("badge_trophy", "Trophy", "For a record collector.", 400, Category.BADGE),
+        Item("badge_diamond", "Diamond", "The one people ask about.", 750, Category.BADGE),
+
+        // --------------------------------------------------------------- titles
+        Item("title_iron", "Iron Will", "For the ones who turned up anyway.", 150, Category.TITLE),
+        Item("title_grinder", "The Grinder", "Volume is a virtue.", 250, Category.TITLE),
+        Item("title_plates", "Plate Collector", "Every record, kept.", 350, Category.TITLE),
+        Item("title_legend", "Gym Legend", "Self-awarded, as all the best ones are.", 800, Category.TITLE),
 
         // -------------------------------------------------------------- widgets
         Item(

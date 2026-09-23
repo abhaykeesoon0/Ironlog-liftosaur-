@@ -24,10 +24,15 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.ironlog.app.data.entity.SetType
+import com.ironlog.app.data.repository.BodyRepository
+import com.ironlog.app.data.repository.CardioRepository
+import com.ironlog.app.domain.usecase.TrainingMath
 
 data class QuestsUiState(
     val isLoading: Boolean = true,
     val balance: Int = 0,
+    val streakWeeks: Int = 0,
     val quests: List<Quests.Progress> = emptyList(),
     val justEarned: Int? = null,
     val error: String? = null
@@ -37,7 +42,9 @@ data class QuestsUiState(
 class QuestsViewModel @Inject constructor(
     private val rewardsRepository: RewardsRepository,
     workoutRepository: WorkoutRepository,
-    goalRepository: StrengthGoalRepository
+    goalRepository: StrengthGoalRepository,
+    cardioRepository: CardioRepository,
+    bodyRepository: BodyRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(QuestsUiState())
@@ -47,25 +54,55 @@ class QuestsViewModel @Inject constructor(
 
     init {
         val keys = Quests.currentKeys(System.currentTimeMillis(), zone)
+        // Seven sources, and combine takes five, so the log and the ledger are
+        // folded first and the activity sources joined to them after.
+        val log = combine(
+            workoutRepository.observeHistory(HISTORY_WINDOW),
+            goalRepository.observeMuscleSessions(),
+            rewardsRepository.observeClaims(keys.values.toList()),
+            rewardsRepository.observeBalance()
+        ) { history, muscleRows, claims, balance -> Log(history, muscleRows, claims, balance) }
+        val activity = combine(
+            cardioRepository.observeSessions(),
+            cardioRepository.observeStepsSince(7),
+            bodyRepository.observeMeasurements()
+        ) { sessions, steps, measurements -> Activity(sessions, steps, measurements) }
+
         viewModelScope.launch {
-            combine(
-                workoutRepository.observeHistory(HISTORY_WINDOW),
-                goalRepository.observeMuscleSessions(),
-                rewardsRepository.observeClaims(keys.values.toList()),
-                rewardsRepository.observeBalance()
-            ) { history, muscleRows, claims, balance ->
+            combine(log, activity) { (history, muscleRows, claims, balance), (cardio, steps, measurements) ->
                 val today = LocalDate.now(zone)
                 val weekStart = today.minusDays((today.dayOfWeek.value - 1).toLong())
+                val monthStart = today.withDayOfMonth(1)
 
                 fun dayOf(millis: Long) = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
 
                 val workouts = history.map { it.workout }
-                val todays = workouts.filter { dayOf(it.startedAt) == today }
+                val todays = history.filter { dayOf(it.workout.startedAt) == today }
                 val thisWeek = workouts.filter { !dayOf(it.startedAt).isBefore(weekStart) }
+                val thisMonth = workouts.filter { !dayOf(it.startedAt).isBefore(monthStart) }
+
+                // An exercise is new this week if the first time it was ever
+                // logged falls inside the week. History arrives newest first.
+                val firstSeen = history.asReversed()
+                    .flatMap { detail -> detail.exercises.map { it.exercise.id to detail.workout.startedAt } }
+                    .groupBy({ it.first }, { it.second })
+                    .mapValues { (_, starts) -> starts.min() }
+
+                val stepsByDay = steps.associate { it.dateEpochDay to it.steps }
+                val stepsThisWeek = (0..6).map { today.minusDays(it.toLong()) }
+                    .filter { !it.isBefore(weekStart) }
+                    .sumOf { stepsByDay[it.toEpochDay()] ?: 0 }
 
                 val inputs = Quests.Inputs(
                     workoutsToday = todays.size,
-                    volumeTodayKg = todays.sumOf { it.totalVolumeKg },
+                    volumeTodayKg = todays.sumOf { it.workout.totalVolumeKg },
+                    musclesToday = muscleRows.filter { dayOf(it.trainedAt) == today }
+                        .map { it.muscle }.distinct().size,
+                    warmupSetsToday = todays.sumOf { detail ->
+                        detail.exercises.sumOf { ex -> ex.sets.count { it.isCompleted && it.type == SetType.WARMUP } }
+                    },
+                    bodyweightLoggedToday = measurements.any { it.weightKg != null && dayOf(it.takenAt) == today },
+                    stepsToday = stepsByDay[today.toEpochDay()] ?: 0,
                     workoutsThisWeek = thisWeek.size,
                     recordsThisWeek = thisWeek.sumOf { it.prCount },
                     musclesThisWeek = muscleRows
@@ -73,12 +110,25 @@ class QuestsViewModel @Inject constructor(
                         .map { it.muscle }
                         .distinct()
                         .size,
-                    longestSessionSecondsThisWeek = thisWeek.maxOfOrNull { it.durationSeconds } ?: 0
+                    longestSessionSecondsThisWeek = thisWeek.maxOfOrNull { it.durationSeconds } ?: 0,
+                    volumeThisWeekKg = thisWeek.sumOf { it.totalVolumeKg },
+                    cardioSessionsThisWeek = cardio.count { !dayOf(it.startedAt).isBefore(weekStart) },
+                    stepsThisWeek = stepsThisWeek,
+                    newExercisesThisWeek = firstSeen.values.count { !dayOf(it).isBefore(weekStart) },
+                    workoutsThisMonth = thisMonth.size,
+                    recordsThisMonth = thisMonth.sumOf { it.prCount },
+                    volumeThisMonthKg = thisMonth.sumOf { it.totalVolumeKg },
+                    lifetimeWorkouts = workouts.size,
+                    lifetimeRecords = workouts.sumOf { it.prCount },
+                    lifetimeVolumeKg = workouts.sumOf { it.totalVolumeKg },
+                    distinctExercisesEver = firstSeen.size,
+                    streakWeeks = TrainingMath.weeklyStreak(workouts.map { it.startedAt })
                 )
 
                 QuestsUiState(
                     isLoading = false,
                     balance = balance,
+                    streakWeeks = inputs.streakWeeks,
                     quests = Quests.progress(inputs, claims.map { it.questId }.toSet())
                 )
             }
@@ -88,6 +138,7 @@ class QuestsViewModel @Inject constructor(
                         it.copy(
                             isLoading = false,
                             balance = next.balance,
+                            streakWeeks = next.streakWeeks,
                             quests = next.quests
                         )
                     }
@@ -110,9 +161,27 @@ class QuestsViewModel @Inject constructor(
     fun dismissEarned() = _state.update { it.copy(justEarned = null) }
     fun dismissError() = _state.update { it.copy(error = null) }
 
+    /** One pass of the log side: workouts, muscle sessions, claims and coins. */
+    private data class Log(
+        val history: List<com.ironlog.app.data.dao.WorkoutWithDetail>,
+        val muscleRows: List<com.ironlog.app.data.dao.MuscleSessionRow>,
+        val claims: List<com.ironlog.app.data.entity.QuestClaimEntity>,
+        val balance: Int
+    )
+
+    /** One pass of the activity side: cardio, steps and the scale. */
+    private data class Activity(
+        val cardio: List<com.ironlog.app.data.entity.CardioSessionEntity>,
+        val steps: List<com.ironlog.app.data.entity.DailyActivityEntity>,
+        val measurements: List<com.ironlog.app.data.entity.BodyMeasurementEntity>
+    )
+
     private companion object {
-        /** A fortnight is more than enough to answer "today" and "this week". */
-        const val HISTORY_WINDOW = 30
+        /**
+         * The milestones count a lifetime, so the whole log is read. It is a
+         * coursework-sized log; a thousand sessions is years of training.
+         */
+        const val HISTORY_WINDOW = 1_000
     }
 }
 
@@ -205,6 +274,7 @@ class EquippedViewModel @Inject constructor(
 data class Equipped(
     val backgroundId: String = StoreCatalogue.DEFAULT_BACKGROUND,
     val badgeId: String? = null,
+    val titleId: String? = null,
     val widgetIds: Set<String> = emptySet()
 ) {
     companion object {
@@ -214,6 +284,7 @@ data class Equipped(
                 backgroundId = equipped.firstOrNull { it.category == StoreCatalogue.Category.BACKGROUND }?.id
                     ?: StoreCatalogue.DEFAULT_BACKGROUND,
                 badgeId = equipped.firstOrNull { it.category == StoreCatalogue.Category.BADGE }?.id,
+                titleId = equipped.firstOrNull { it.category == StoreCatalogue.Category.TITLE }?.id,
                 widgetIds = equipped.filter { it.category == StoreCatalogue.Category.WIDGET }.map { it.id }.toSet()
             )
         }

@@ -55,6 +55,7 @@ import com.ironlog.app.ui.theme.Slate600
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Space
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.filled.LocalFireDepartment
 
 /**
  * Quests and the wallet.
@@ -112,17 +113,33 @@ fun QuestsScreen(
                     }
                 }
 
-                val daily = state.quests.filter { it.quest.period == Quests.Period.DAILY }
-                val weekly = state.quests.filter { it.quest.period == Quests.Period.WEEKLY }
+                if (state.streakWeeks > 1) {
+                    item {
+                        IronCard {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = PrGold)
+                                Spacer(Modifier.width(Space.sm))
+                                Column {
+                                    Text(
+                                        "${state.streakWeeks}-week streak: +${(Quests.streakBonus(state.streakWeeks) * 100).toInt()}% on every reward",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = Chalk
+                                    )
+                                    Caption(
+                                        if (Quests.streakBonus(state.streakWeeks) >= Quests.STREAK_BONUS_CAP) "The most it goes. Keep it there."
+                                        else "Another week adds ten percent, up to half again."
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
-                item { SectionHeader("Today") }
-                items(daily, key = { it.quest.id }) { QuestCard(it) { viewModel.claim(it.quest) } }
-
-                item { SectionHeader("This week") }
-                items(weekly, key = { it.quest.id }) { QuestCard(it) { viewModel.claim(it.quest) } }
-
-                item {
-                    Caption("Daily quests reset at midnight. Weekly quests reset on Monday.")
+                Quests.Period.entries.forEach { period ->
+                    val inPeriod = state.quests.filter { it.quest.period == period }
+                    item(key = "header-${period.name}") { SectionHeader(period.label) }
+                    items(inPeriod, key = { it.quest.id }) { QuestCard(it) { viewModel.claim(it.quest) } }
+                    item(key = "resets-${period.name}") { Caption(period.resets + ".") }
                 }
                 item { Spacer(Modifier.height(Space.xl)) }
             }
@@ -178,11 +195,14 @@ private fun QuestCard(progress: Quests.Progress, onClaim: () -> Unit) {
                     )
                     Spacer(Modifier.width(Space.xs))
                     Text(
-                        quest.coins.toString(),
+                        progress.payout.toString(),
                         style = NumericType.small,
                         color = if (progress.isClaimed) ChalkFaint else PrGold
                     )
                 }
+            }
+            if (progress.bonus > 0 && !progress.isClaimed) {
+                Caption("${quest.coins} + ${progress.bonus} streak bonus")
             }
 
             Spacer(Modifier.height(Space.md))
@@ -231,9 +251,10 @@ private fun QuestCard(progress: Quests.Progress, onClaim: () -> Unit) {
 private fun formatProgress(progress: Quests.Progress): String {
     val quest = progress.quest
     val current = progress.current
-    return when (quest.id) {
-        "daily_volume" -> "${current.roundToInt()} / ${quest.target.roundToInt()} kg"
-        "weekly_long_session" -> "${(current / 60).roundToInt()} / ${(quest.target / 60).roundToInt()} min"
-        else -> "${current.roundToInt()} / ${quest.target.roundToInt()}"
+    return when (quest.unit) {
+        Quests.Unit.KILOGRAMS -> "%,d / %,d kg".format(current.roundToInt(), quest.target.roundToInt())
+        Quests.Unit.STEPS -> "%,d / %,d steps".format(current.roundToInt(), quest.target.roundToInt())
+        Quests.Unit.MINUTES -> "${(current / 60).roundToInt()} / ${(quest.target / 60).roundToInt()} min"
+        Quests.Unit.COUNT -> "${current.roundToInt()} / ${quest.target.roundToInt()}"
     }
 }
