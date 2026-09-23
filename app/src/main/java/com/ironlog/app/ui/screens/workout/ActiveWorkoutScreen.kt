@@ -80,6 +80,20 @@ import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.theme.Space
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
+import com.ironlog.app.data.entity.MuscleGroup
+import com.ironlog.app.data.entity.MuscleTint
+import com.ironlog.app.data.entity.SetType
+import com.ironlog.app.ui.components.TrainedMuscles
+import com.ironlog.app.ui.theme.Slate600
 
 @Composable
 fun ActiveWorkoutScreen(
@@ -180,6 +194,14 @@ fun ActiveWorkoutScreen(
                         volume = state.unit.formatVolume(state.volumeKg),
                         completedSets = state.completedSets,
                         onRename = { renameOpen = true }
+                    )
+                }
+
+                item(key = "muscles") {
+                    MusclesTrainedCard(
+                        blocks = state.exercises,
+                        tint = state.muscleTint,
+                        onTint = viewModel::setMuscleTint
                     )
                 }
 
@@ -592,3 +614,70 @@ private fun RestDialog(
     )
 }
 
+
+/**
+ * The figure that fills in as the session goes.
+ *
+ * A muscle counts as trained once one working set of an exercise that uses it
+ * is complete: a warm-up on the bench does not light the chest, and neither
+ * does a set that is still waiting for its tick. The colour is the user's, and
+ * the swatches under the figure change it without leaving the workout.
+ */
+@Composable
+private fun MusclesTrainedCard(
+    blocks: List<ExerciseBlock>,
+    tint: MuscleTint,
+    onTint: (MuscleTint) -> Unit
+) {
+    val worked = blocks.filter { block ->
+        block.sets.any { it.isCompleted && it.type.countsTowardVolume }
+    }
+    val primary = worked.map { it.item.exercise.primaryMuscle }.toSet()
+    val secondary = worked
+        .flatMap { block ->
+            block.item.exercise.secondaryMuscles.split(",")
+                .mapNotNull { name -> runCatching { MuscleGroup.valueOf(name.trim()) }.getOrNull() }
+        }
+        .toSet() - primary
+
+    IronCard {
+        Column {
+            Text("Muscles trained", style = MaterialTheme.typography.titleMedium, color = Chalk)
+            Caption(
+                if (worked.isEmpty()) "Fills in as you complete sets."
+                else "Solid for the muscle a lift trains hardest, lighter for the ones helping."
+            )
+            Spacer(Modifier.height(Space.md))
+            TrainedMuscles(primary = primary, secondary = secondary, tint = Color(tint.argb))
+            Spacer(Modifier.height(Space.md))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Colour", style = MaterialTheme.typography.labelMedium, color = ChalkDim)
+                Spacer(Modifier.width(Space.xs))
+                MuscleTint.entries.forEach { option ->
+                    val chosen = option == tint
+                    Box(
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(option.argb))
+                            .border(
+                                width = if (chosen) 3.dp else 1.dp,
+                                color = if (chosen) Chalk else Slate600,
+                                shape = CircleShape
+                            )
+                            .clickable { onTint(option) }
+                            .semantics {
+                                role = Role.RadioButton
+                                selected = chosen
+                                contentDescription = "${option.label} for trained muscles"
+                            }
+                    )
+                }
+            }
+        }
+    }
+}

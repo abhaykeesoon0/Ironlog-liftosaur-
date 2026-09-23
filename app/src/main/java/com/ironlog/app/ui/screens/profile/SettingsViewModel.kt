@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.ironlog.app.data.entity.MuscleTint
 
 data class SettingsUiState(
     val exporting: ExportKind? = null,
@@ -60,6 +61,9 @@ class SettingsViewModel @Inject constructor(
 
     val welcomeSound: StateFlow<Boolean> = profileRepository.welcomeSoundEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    val muscleTint: StateFlow<MuscleTint> = profileRepository.muscleTint
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MuscleTint.PLUM)
 
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
@@ -97,6 +101,9 @@ class SettingsViewModel @Inject constructor(
 
     fun setStepSource(source: StepSource) =
         persist("Could not change the step source") { profileRepository.setStepSource(source) }
+
+    fun setMuscleTint(tint: MuscleTint) =
+        persist("Could not change the colour") { profileRepository.setMuscleTint(tint) }
 
     fun setPlateSet(plateSet: PlateSet) =
         persist("Could not change the plate set") { profileRepository.setPlateSet(plateSet) }
