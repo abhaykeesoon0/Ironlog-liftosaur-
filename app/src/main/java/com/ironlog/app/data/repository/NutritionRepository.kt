@@ -22,6 +22,7 @@ import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.ironlog.app.core.nutrition.OpenFoodFacts
 
 /** What the goal form collects. Height and weight fall back to the profile when left out. */
 data class GoalInput(
@@ -41,8 +42,16 @@ data class FoodInput(
     val proteinPer100g: Double,
     val carbsPer100g: Double,
     val fatPer100g: Double,
-    val servingGrams: Double
+    val servingGrams: Double,
+    /** Set when the figures came from a scanned label. */
+    val barcode: String? = null
 )
+
+/** What a scan came back with: a food already in the library, or one to confirm. */
+sealed interface ScanResult {
+    data class Known(val food: FoodEntity) : ScanResult
+    data class Found(val input: FoodInput, val source: String) : ScanResult
+}
 
 interface NutritionRepository {
     fun observeFoods(): Flow<List<FoodEntity>>
@@ -55,13 +64,20 @@ interface NutritionRepository {
     suspend fun deleteLog(id: String): Result<Unit>
     suspend fun createFood(input: FoodInput): Result<FoodEntity>
     suspend fun saveGoal(input: GoalInput): Result<NutritionGoalEntity>
+
+    /**
+     * Resolves a barcode: the library first, so a product scanned before never
+     * needs the network again, and Open Food Facts only when it is new.
+     */
+    suspend fun scan(barcode: String): Result<ScanResult>
 }
 
 @Singleton
 class NutritionRepositoryImpl @Inject constructor(
     private val nutritionDao: NutritionDao,
     private val userDao: UserDao,
-    private val currentUser: CurrentUser
+    private val currentUser: CurrentUser,
+    private val openFoodFacts: OpenFoodFacts
 ) : NutritionRepository {
 
     private val zone: ZoneId get() = ZoneId.systemDefault()
@@ -131,7 +147,8 @@ class NutritionRepositoryImpl @Inject constructor(
                 servingGrams = input.servingGrams,
                 servingLabel = "1 serving",
                 ownerUserId = userId,
-                isCustom = true
+                isCustom = true,
+                barcode = input.barcode?.filter { it.isDigit() }?.takeIf { it.isNotEmpty() }
             )
             nutritionDao.upsertFood(food)
             food
@@ -175,6 +192,30 @@ class NutritionRepositoryImpl @Inject constructor(
                 userDao.update(user.copy(bodyweightKg = weight, heightCm = height))
             }
             goal
+        }
+    }
+
+    override suspend fun scan(barcode: String): Result<ScanResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            val userId = currentUser.require()
+            val clean = barcode.filter { it.isDigit() }
+            if (clean.length !in 8..14) throw UserFacingException("That does not look like a product barcode")
+            nutritionDao.findByBarcode(userId, clean)?.let { return@runCatching ScanResult.Known(it) }
+
+            val product = openFoodFacts.lookup(clean)
+            ScanResult.Found(
+                input = FoodInput(
+                    name = listOfNotNull(product.brand, product.name).joinToString(" "),
+                    group = FoodGroup.SNACK,
+                    kcalPer100g = product.kcalPer100g,
+                    proteinPer100g = product.proteinPer100g,
+                    carbsPer100g = product.carbsPer100g,
+                    fatPer100g = product.fatPer100g,
+                    servingGrams = product.servingGrams ?: 100.0,
+                    barcode = clean
+                ),
+                source = "Open Food Facts, under the Open Database Licence"
+            )
         }
     }
 

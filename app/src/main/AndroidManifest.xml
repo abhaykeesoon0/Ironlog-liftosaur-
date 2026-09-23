@@ -6,6 +6,8 @@
          DEVICE INTEGRATION 1 - CAMERA (progress photos, avatar)
          ============================================================ -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Optional: the scanner and the photos need it, logging a workout does not. -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <!-- ============================================================
          DEVICE INTEGRATION 2 - GPS / LOCATION (cardio route tracking)

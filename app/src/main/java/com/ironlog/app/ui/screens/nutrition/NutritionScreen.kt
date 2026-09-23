@@ -76,6 +76,16 @@ import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.theme.Space
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.filled.QrCodeScanner
+import com.ironlog.app.core.permissions.AppPermission
+import com.ironlog.app.core.permissions.rememberPermissionState
+import com.ironlog.app.data.repository.ScanResult
+import com.ironlog.app.core.media.BarcodeScannerView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.statusBarsPadding
+import com.ironlog.app.ui.theme.Slate900
 
 /**
  * Today's food against the targets, meal by meal.
@@ -175,8 +185,10 @@ fun NutritionScreen(
         AddFoodSheet(
             meal = meal,
             foods = state.foods,
+            isScanning = state.isScanning,
             onLog = { food, grams -> viewModel.logFood(food, grams, meal); addingTo = null },
             onCreate = { input, then -> viewModel.createFood(input, then) },
+            onScan = { code, then -> viewModel.scan(code, then) },
             onDismiss = { addingTo = null }
         )
     }
@@ -304,8 +316,10 @@ private fun EntryRow(entry: FoodLogWithFood, onDelete: () -> Unit) {
 private fun AddFoodSheet(
     meal: Meal,
     foods: List<FoodEntity>,
+    isScanning: Boolean,
     onLog: (FoodEntity, Double) -> Unit,
     onCreate: (FoodInput, (FoodEntity) -> Unit) -> Unit,
+    onScan: (String, (ScanResult) -> Unit) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -313,10 +327,31 @@ private fun AddFoodSheet(
     var chosen by remember { mutableStateOf<FoodEntity?>(null) }
     var grams by remember { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
+    /** Filled in from a scan, so the form opens with the label's figures. */
+    var prefill by remember { mutableStateOf<FoodInput?>(null) }
+    var prefillSource by remember { mutableStateOf<String?>(null) }
+    var scanning by remember { mutableStateOf(false) }
+    var typedCode by remember { mutableStateOf("") }
+    val camera = rememberPermissionState(AppPermission.CAMERA)
+
+    fun handle(result: ScanResult) {
+        scanning = false
+        when (result) {
+            is ScanResult.Known -> { chosen = result.food; grams = result.food.servingGrams.roundToInt().toString() }
+            is ScanResult.Found -> { prefill = result.input; prefillSource = result.source; creating = true }
+        }
+    }
 
     val matches = remember(query, foods) {
         val q = query.trim()
         if (q.isEmpty()) foods else foods.filter { it.name.contains(q, ignoreCase = true) }
+    }
+
+    if (scanning) {
+        ScannerDialog(
+            onBarcode = { code -> onScan(code, ::handle) },
+            onDismiss = { scanning = false }
+        )
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Slate800) {
@@ -328,7 +363,14 @@ private fun AddFoodSheet(
 
             val selected = chosen
             if (creating) {
-                item { CreateFoodForm(onCreate = { input -> onCreate(input) { created -> chosen = created; creating = false } }, onCancel = { creating = false }) }
+                item {
+                    CreateFoodForm(
+                        initial = prefill,
+                        source = prefillSource,
+                        onCreate = { input -> onCreate(input) { created -> chosen = created; creating = false; prefill = null; prefillSource = null } },
+                        onCancel = { creating = false; prefill = null; prefillSource = null }
+                    )
+                }
             } else if (selected != null) {
                 item {
                     IronCard {
@@ -372,7 +414,37 @@ private fun AddFoodSheet(
                     IronTextField(value = query, onValueChange = { query = it.take(40) }, label = "Search foods", placeholder = "Chicken, rice, banana…")
                 }
                 item {
-                    SecondaryButton(text = "Add a food that is not here", onClick = { creating = true }, leadingIcon = Icons.Default.Add)
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        SecondaryButton(
+                            text = if (isScanning) "Looking up" else "Scan a barcode",
+                            onClick = { camera.runWithPermission { scanning = true } },
+                            enabled = !isScanning,
+                            leadingIcon = Icons.Default.QrCodeScanner,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SecondaryButton(text = "Add by hand", onClick = { creating = true }, leadingIcon = Icons.Default.Add, modifier = Modifier.weight(1f))
+                    }
+                }
+                item {
+                    // The number under the bars, for a scuffed label or a phone
+                    // with no camera. Same lookup, no lens.
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        IronTextField(
+                            value = typedCode,
+                            onValueChange = { typedCode = it.filter(Char::isDigit).take(14) },
+                            label = "Or type the barcode",
+                            keyboardType = KeyboardType.Number,
+                            modifier = Modifier.weight(1f)
+                        )
+                        // A fixed width, because the button fills whatever it is
+                        // given and would otherwise starve the field beside it.
+                        SecondaryButton(
+                            text = "Look up",
+                            enabled = typedCode.length >= 8 && !isScanning,
+                            onClick = { onScan(typedCode, ::handle) },
+                            modifier = Modifier.width(LOOKUP_WIDTH)
+                        )
+                    }
                 }
                 items(matches, key = { it.id }) { food ->
                     IronCard(onClick = { chosen = food; grams = food.servingGrams.roundToInt().toString() }) {
@@ -393,19 +465,26 @@ private fun AddFoodSheet(
 }
 
 @Composable
-private fun CreateFoodForm(onCreate: (FoodInput) -> Unit, onCancel: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var group by remember { mutableStateOf(FoodGroup.PROTEIN) }
-    var kcal by remember { mutableStateOf("") }
-    var protein by remember { mutableStateOf("") }
-    var carbs by remember { mutableStateOf("") }
-    var fat by remember { mutableStateOf("") }
-    var serving by remember { mutableStateOf("100") }
+private fun CreateFoodForm(
+    onCreate: (FoodInput) -> Unit,
+    onCancel: () -> Unit,
+    initial: FoodInput? = null,
+    source: String? = null
+) {
+    fun fmt(v: Double?) = v?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: ""
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var group by remember { mutableStateOf(initial?.group ?: FoodGroup.PROTEIN) }
+    var kcal by remember { mutableStateOf(fmt(initial?.kcalPer100g)) }
+    var protein by remember { mutableStateOf(fmt(initial?.proteinPer100g)) }
+    var carbs by remember { mutableStateOf(fmt(initial?.carbsPer100g)) }
+    var fat by remember { mutableStateOf(fmt(initial?.fatPer100g)) }
+    var serving by remember { mutableStateOf(fmt(initial?.servingGrams ?: 100.0)) }
     fun num(s: String) = s.toDoubleOrNull()
 
     IronCard {
         Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-            Text("New food, per 100 g", style = MaterialTheme.typography.titleMedium, color = Chalk)
+            Text(if (initial != null) "Check the label" else "New food, per 100 g", style = MaterialTheme.typography.titleMedium, color = Chalk)
+            source?.let { Caption("From $it. Check the figures against the packet before saving.") }
             IronTextField(value = name, onValueChange = { name = it.take(60) }, label = "Name")
             FilterChipRow(options = FoodGroup.entries, selected = group, label = { it.label }, onSelect = { it?.let { g -> group = g } })
             Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
@@ -428,7 +507,8 @@ private fun CreateFoodForm(onCreate: (FoodInput) -> Unit, onCancel: () -> Unit) 
                                 name = name, group = group,
                                 kcalPer100g = num(kcal) ?: 0.0, proteinPer100g = num(protein) ?: 0.0,
                                 carbsPer100g = num(carbs) ?: 0.0, fatPer100g = num(fat) ?: 0.0,
-                                servingGrams = num(serving) ?: 100.0
+                                servingGrams = num(serving) ?: 100.0,
+                                barcode = initial?.barcode
                             )
                         )
                     },
@@ -500,6 +580,44 @@ private fun GoalSheet(
                     )
                 }
             )
+        }
+    }
+}
+
+private val LOOKUP_WIDTH = 116.dp
+
+/**
+ * The camera, full screen, until a code is read or the user backs out.
+ *
+ * Its own dialog rather than a panel in the sheet: a viewfinder needs the
+ * whole screen to be usable at arm's length, and a half-height camera behind
+ * a keyboard is not a scanner.
+ */
+@Composable
+private fun ScannerDialog(onBarcode: (String) -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(Slate900)) {
+            BarcodeScannerView(onBarcode = onBarcode, modifier = Modifier.fillMaxSize())
+            // Controls at the top, under the status bar. The dialog runs edge to
+            // edge and its bottom edge is not where the screen's is, so a button
+            // anchored down there ended up below the glass, present but
+            // unreachable. The top edge is honest.
+            Row(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .background(Slate900.copy(alpha = 0.82f))
+                    .statusBarsPadding()
+                    .padding(Space.lg),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Scan a barcode", style = MaterialTheme.typography.titleMedium, color = Chalk)
+                    Caption("Point the camera at the packet. It reads on the phone; nothing is uploaded.")
+                }
+                Spacer(Modifier.width(Space.md))
+                SecondaryButton(text = "Cancel", onClick = onDismiss, modifier = Modifier.width(LOOKUP_WIDTH))
+            }
         }
     }
 }

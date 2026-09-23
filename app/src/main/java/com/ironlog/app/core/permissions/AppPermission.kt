@@ -29,9 +29,10 @@ enum class AppPermission(
 ) {
     CAMERA(
         title = "Camera",
-        rationale = "IronLog opens the camera so you can take progress photos and a profile picture. " +
-            "Photos stay in the app's private storage on this phone and are never uploaded.",
-        deniedConsequence = "Without camera access you can still pick existing images, but you can't shoot a new progress photo in the app."
+        rationale = "IronLog opens the camera to take progress photos and a profile picture, and to " +
+            "scan food barcodes. Photos stay in the app's private storage on this phone; scanned " +
+            "frames are read on the phone and never stored or sent.",
+        deniedConsequence = "Without camera access you can still pick existing images and type a barcode by hand, but you can't shoot a photo or scan a label in the app."
     ),
     LOCATION(
         title = "Location",

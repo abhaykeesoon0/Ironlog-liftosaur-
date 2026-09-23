@@ -75,7 +75,7 @@ object DatabaseModule {
             // No destructive fallback: silently wiping a user's training history
             // on a schema change would be a data-loss bug, not a convenience.
             // Migrations are added explicitly when the schema moves.
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
 
     /**
@@ -149,6 +149,13 @@ object DatabaseModule {
                 )
                 """.trimIndent()
             )
+        }
+    }
+
+    /** Adds the barcode a scanned food came from. One nullable column, nothing else. */
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `foods` ADD COLUMN `barcode` TEXT")
         }
     }
 
