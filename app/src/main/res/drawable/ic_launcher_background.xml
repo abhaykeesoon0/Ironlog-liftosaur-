@@ -1,5 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The icon's background: the app's own slate, lit from the top left.
+
+    A flat fill is what it was before, and a flat fill is what a launcher full
+    of gradients makes look unfinished. The gradient is slight on purpose: two
+    steps either side of the app background, not a colour in its own right, and
+    the highlight is a single soft wash rather than a gloss.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#0E1216" android:pathData="M0,0h108v108h-108z" />
+
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0" android:startY="0"
+                android:endX="108" android:endY="108">
+                <item android:offset="0" android:color="#FF18222D" />
+                <item android:offset="0.55" android:color="#FF0E1216" />
+                <item android:offset="1" android:color="#FF080B0E" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="30" android:centerY="24"
+                android:gradientRadius="74">
+                <item android:offset="0" android:color="#1FFFFFFF" />
+                <item android:offset="1" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

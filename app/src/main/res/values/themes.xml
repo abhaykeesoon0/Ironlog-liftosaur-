@@ -5,4 +5,25 @@
         <item name="android:navigationBarColor">#0E1216</item>
         <item name="android:windowBackground">#0E1216</item>
     </style>
+
+    <!--
+        The launch theme, which is what the system draws before a single line of
+        our code runs.
+
+        Without one, Android puts up a bare window in the app's background colour
+        and the first thing the user sees is an empty rectangle. With one, the
+        mark is on screen from the first frame and stays there until the session
+        has been read, so the app never flashes a loading spinner on the way in.
+
+        The background here has to be a single colour: on Android 12 and later
+        the system owns this window and only accepts one. The gradient is in the
+        launch screen the app draws itself, immediately afterwards.
+    -->
+    <style name="Theme.IronLog.Launch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0E1216</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.IronLog</item>
+        <item name="android:statusBarColor">#0E1216</item>
+        <item name="android:navigationBarColor">#0E1216</item>
+    </style>
 </resources>

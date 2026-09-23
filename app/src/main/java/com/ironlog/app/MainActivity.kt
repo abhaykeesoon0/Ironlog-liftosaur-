@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.viewModels
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -43,7 +44,7 @@ import com.ironlog.app.data.repository.AuthRepository
 import com.ironlog.app.data.repository.ProfileRepository
 import com.ironlog.app.data.repository.SessionState
 import com.ironlog.app.ui.components.ErrorBanner
-import com.ironlog.app.ui.components.LoadingBlock
+import com.ironlog.app.ui.components.LaunchScreen
 import com.ironlog.app.ui.components.PrimaryButton
 import com.ironlog.app.ui.navigation.AuthNavHost
 import com.ironlog.app.ui.screens.rewards.EquippedViewModel
@@ -78,7 +79,12 @@ class MainActivity : FragmentActivity() {
     private var deepLinkRoute by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Before super, which is where the system expects to be told. The mark
+        // then stays on screen until the session has been read, so the app is
+        // never caught mid-decision with a spinner showing.
+        val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splash.setKeepOnScreenCondition { mainViewModel.sessionState.value is SessionState.Loading }
         enableEdgeToEdge()
         if (savedInstanceState == null) {
             deepLinkRoute = intent?.getStringExtra(EXTRA_DEEP_LINK_ROUTE)
@@ -145,7 +151,7 @@ private fun IronLogApp(
     val session by viewModel.sessionState.collectAsStateWithLifecycle()
 
     when (val state = session) {
-        SessionState.Loading -> LoadingBlock(Modifier.fillMaxSize())
+        SessionState.Loading -> LaunchScreen(Modifier.fillMaxSize())
 
         SessionState.SignedOut -> AuthNavHost(onAuthenticated = { viewModel.onAuthenticated() })
 
