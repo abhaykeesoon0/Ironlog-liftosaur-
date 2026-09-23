@@ -57,6 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.height
+import com.ironlog.app.data.seed.MovementPatterns
 import com.ironlog.app.domain.usecase.MovementPattern
 import com.ironlog.app.ui.components.MovementAnimation
 import com.ironlog.app.ui.components.MuscleHighlight
@@ -191,7 +192,12 @@ fun ExerciseLibraryScreen(
 @Composable
 private fun MovementDemoDialog(exercise: ExerciseEntity, onDismiss: () -> Unit) {
     val pattern = remember(exercise.id) {
-        MovementPattern.of(exercise.name, exercise.primaryMuscle, exercise.category)
+        // The shipped library's movements were decided offline against the
+        // source dataset, so they are looked up rather than guessed. Reading
+        // the name is the fallback, and only a movement nobody has classified
+        // -- one the user wrote, or imported -- ever reaches it.
+        MovementPatterns.byExerciseId[exercise.id]
+            ?: MovementPattern.of(exercise.name, exercise.primaryMuscle, exercise.category)
     }
     val secondary = remember(exercise.id) {
         exercise.secondaryMuscles
