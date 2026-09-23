@@ -91,6 +91,7 @@ import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Space
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
+import com.ironlog.app.ui.screens.rewards.titleText
 
 @Composable
 fun HomeScreen(
@@ -158,6 +159,11 @@ fun HomeScreen(
                 Spacer(Modifier.width(Space.sm))
                 Icon(icon, contentDescription = "Your badge", tint = Chalk, modifier = Modifier.size(28.dp))
             }
+        }
+        // A bought title, under the name. Gold like a record, because it was
+        // paid for with coins that were earned the same way.
+        titleText(equipped.titleId)?.let { title ->
+            Text(title, style = MaterialTheme.typography.labelLarge, color = PrGold)
         }
         Spacer(Modifier.height(Space.lg))
 

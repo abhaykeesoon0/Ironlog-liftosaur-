@@ -14,6 +14,9 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.ironlog.app.data.dao.WorkoutDao
+import com.ironlog.app.domain.usecase.TrainingMath
+import kotlinx.coroutines.flow.first
 
 interface RewardsRepository {
     /** Coins earned less coins spent. */
@@ -33,6 +36,7 @@ interface RewardsRepository {
 class RewardsRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val rewardsDao: RewardsDao,
+    private val workoutDao: WorkoutDao,
     private val currentUser: CurrentUser
 ) : RewardsRepository {
 
@@ -49,7 +53,9 @@ class RewardsRepositoryImpl @Inject constructor(
      * Pays out a quest, once per period.
      *
      * The payout is read from the catalogue rather than taken from the caller,
-     * so a screen cannot ask for an amount of its own choosing, and the whole
+     * so a screen cannot ask for an amount of its own choosing. The streak
+     * bonus is worked out here from the log for the same reason: a bonus the
+     * screen reported would be a bonus the screen could inflate. The whole
      * thing runs in a transaction: two taps arriving together must not both see
      * an unclaimed quest and both pay.
      */
@@ -58,6 +64,8 @@ class RewardsRepositoryImpl @Inject constructor(
             runCatching {
                 val userId = currentUser.require()
                 val quest = Quests.byId(questId) ?: throw UserFacingException("That quest no longer exists")
+                val streak = TrainingMath.weeklyStreak(workoutDao.observeWorkoutDates(userId).first())
+                val payout = Quests.payout(quest, streak)
 
                 database.withTransaction {
                     if (rewardsDao.claimCount(userId, questId, periodKey) > 0) {
@@ -69,12 +77,12 @@ class RewardsRepositoryImpl @Inject constructor(
                             userId = userId,
                             questId = questId,
                             periodKey = periodKey,
-                            coins = quest.coins,
+                            coins = payout,
                             claimedAt = System.currentTimeMillis()
                         )
                     )
                 }
-                quest.coins
+                payout
             }
         }
 

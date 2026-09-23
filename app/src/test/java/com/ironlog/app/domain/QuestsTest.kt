@@ -94,12 +94,14 @@ class QuestsTest {
         // A quest whose id is not handled would sit at zero forever, so this
         // pins the list and the lookup together.
         val generous = Quests.Inputs(
-            workoutsToday = 99,
-            volumeTodayKg = 999_999.0,
-            workoutsThisWeek = 99,
-            recordsThisWeek = 99,
-            musclesThisWeek = 99,
-            longestSessionSecondsThisWeek = 99_999
+            workoutsToday = 99, volumeTodayKg = 999_999.0, musclesToday = 99, warmupSetsToday = 99,
+            bodyweightLoggedToday = true, stepsToday = 99_999,
+            workoutsThisWeek = 99, recordsThisWeek = 99, musclesThisWeek = 99,
+            longestSessionSecondsThisWeek = 99_999, volumeThisWeekKg = 999_999.0,
+            cardioSessionsThisWeek = 99, stepsThisWeek = 999_999, newExercisesThisWeek = 99,
+            workoutsThisMonth = 99, recordsThisMonth = 99, volumeThisMonthKg = 999_999.0,
+            lifetimeWorkouts = 999, lifetimeRecords = 999, lifetimeVolumeKg = 9_999_999.0,
+            distinctExercisesEver = 999, streakWeeks = 99
         )
         assertTrue(Quests.progress(generous, emptySet()).all { it.isComplete })
     }
@@ -119,8 +121,62 @@ class QuestsTest {
     }
 
     @Test
-    fun `the current keys cover both periods`() {
+    fun `the current keys cover every period`() {
         val keys = Quests.currentKeys(millis(LocalDate.of(2026, 9, 21).atStartOfDay()), zone)
-        assertEquals(setOf(Quests.Period.DAILY, Quests.Period.WEEKLY), keys.keys)
+        assertEquals(Quests.Period.entries.toSet(), keys.keys)
+        assertEquals("2026-09", keys.getValue(Quests.Period.MONTHLY))
+    }
+
+    @Test
+    fun `a milestone's key never changes, which is what makes it once`() {
+        val now = millis(LocalDateTime.of(2026, 9, 21, 10, 0))
+        val nextYear = millis(LocalDateTime.of(2027, 9, 21, 10, 0))
+        assertEquals(
+            Quests.periodKey(Quests.Period.ONCE, now, zone),
+            Quests.periodKey(Quests.Period.ONCE, nextYear, zone)
+        )
+    }
+
+    @Test
+    fun `a month key rolls over on the first`() {
+        val lastOfSeptember = millis(LocalDateTime.of(2026, 9, 30, 23, 0))
+        val firstOfOctober = millis(LocalDateTime.of(2026, 10, 1, 1, 0))
+        assertTrue(
+            Quests.periodKey(Quests.Period.MONTHLY, lastOfSeptember, zone) !=
+                Quests.periodKey(Quests.Period.MONTHLY, firstOfOctober, zone)
+        )
+    }
+
+    @Test
+    fun `the streak bonus starts on the second week and stops at half again`() {
+        val quest = Quests.byId("daily_session")!!
+        assertEquals(20, Quests.payout(quest, streakWeeks = 0))
+        assertEquals(20, Quests.payout(quest, streakWeeks = 1))
+        assertEquals(22, Quests.payout(quest, streakWeeks = 2))
+        assertEquals(30, Quests.payout(quest, streakWeeks = 6))
+        assertEquals(30, Quests.payout(quest, streakWeeks = 40))
+    }
+
+    @Test
+    fun `progress carries the payout, bonus included`() {
+        val list = Quests.progress(Quests.Inputs(workoutsToday = 1, streakWeeks = 3), emptySet())
+        val daily = list.single { it.quest.id == "daily_session" }
+        assertEquals(24, daily.payout)
+        assertEquals(4, daily.bonus)
+    }
+
+    @Test
+    fun `milestones pay once and more than the routine`() {
+        val milestones = Quests.ALL.filter { it.period == Quests.Period.ONCE }
+        val daily = Quests.ALL.filter { it.period == Quests.Period.DAILY }
+        assertTrue(milestones.isNotEmpty())
+        assertTrue(milestones.minOf { it.coins } >= daily.maxOf { it.coins })
+    }
+
+    @Test
+    fun `a title is the only thing that goes under the name`() {
+        val titles = StoreCatalogue.inCategory(StoreCatalogue.Category.TITLE)
+        assertTrue(titles.isNotEmpty())
+        assertTrue(titles.all { it.price > 0 })
     }
 }
