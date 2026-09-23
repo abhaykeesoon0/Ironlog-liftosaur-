@@ -2,6 +2,7 @@ package com.ironlog.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ironlog.app.domain.usecase.Gamification
 import com.ironlog.app.ui.theme.Chalk
@@ -220,26 +222,33 @@ fun StreakCard(
 }
 
 /** One day in the heatmap. [volumeKg] of zero means a rest day. */
-data class HeatmapDay(val dayOfMonth: Int, val volumeKg: Double)
+data class HeatmapDay(val dayOfMonth: Int, val volumeKg: Double, val workouts: Int = 0) {
+    val trained: Boolean get() = workouts > 0
+}
 
 /**
- * A month of training days, shaded by volume -- the contribution-graph idea.
+ * A month of training days, shaded by volume -- the contribution-graph idea,
+ * laid out as the calendar it is so a day can be pressed.
  *
  * Shade comes from the day's share of the heaviest day in the month, in four
  * steps. A continuous ramp looks precise but nobody can read a 3% difference in
  * opacity, and four steps are enough to see a hard week from a light one.
+ *
+ * A trained day is a button: pressing it hands the day to [onDayClick], which
+ * is how the log for that day is reached without scrolling for it. Rest days
+ * are not buttons, because there is nothing behind them to open.
  */
 @Composable
 fun MonthHeatmap(
     days: List<HeatmapDay>,
     firstDayOffset: Int,
     modifier: Modifier = Modifier,
-    cell: androidx.compose.ui.unit.Dp = 16.dp
+    onDayClick: ((HeatmapDay) -> Unit)? = null
 ) {
     if (days.isEmpty()) return
     val peak = days.maxOf { it.volumeKg }
-    val trained = days.count { it.volumeKg > 0 }
-    val description = "Training days this month: $trained of ${days.size}."
+    val trained = days.count { it.trained }
+    val description = "Training days this month: $trained of ${days.size}. Press a shaded day to see what was trained."
 
     Column(
         modifier
@@ -252,32 +261,70 @@ fun MonthHeatmap(
                     label,
                     style = MaterialTheme.typography.labelSmall,
                     color = ChalkFaint,
-                    modifier = Modifier.width(cell)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
         Spacer(Modifier.height(Space.xs))
 
-        // Blank leading cells so the first of the month sits under its weekday.
+        // Blank leading cells so the first of the month sits under its weekday,
+        // and blank trailing cells so the last row keeps seven columns.
         val cells = List(firstDayOffset) { null } + days
-        cells.chunked(DAYS_IN_WEEK).forEach { week ->
+        val padded = cells + List((DAYS_IN_WEEK - cells.size % DAYS_IN_WEEK) % DAYS_IN_WEEK) { null }
+        padded.chunked(DAYS_IN_WEEK).forEach { week ->
             Row(
                 Modifier.padding(bottom = Space.xs),
                 horizontalArrangement = Arrangement.spacedBy(Space.xs)
             ) {
                 week.forEach { day ->
-                    Box(
-                        Modifier
-                            .size(cell)
-                            .clip(RoundedCornerShape(Radius.panel))
-                            .background(heatColour(day?.volumeKg ?: 0.0, peak))
-                            .clearAndSetSemantics { }
-                    )
+                    DayCell(day, peak, onDayClick, Modifier.weight(1f))
                 }
             }
         }
     }
 }
+
+@Composable
+private fun DayCell(
+    day: HeatmapDay?,
+    peak: Double,
+    onDayClick: ((HeatmapDay) -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    if (day == null) {
+        Spacer(modifier.height(CELL_HEIGHT))
+        return
+    }
+    val pressable = day.trained && onDayClick != null
+    Box(
+        modifier
+            .height(CELL_HEIGHT)
+            .clip(RoundedCornerShape(Radius.panel))
+            .background(heatColour(day.volumeKg, peak))
+            .then(
+                if (pressable) {
+                    Modifier.clickable(onClickLabel = "Show the workouts on day ${day.dayOfMonth}") {
+                        onDayClick?.invoke(day)
+                    }
+                } else {
+                    Modifier.clearAndSetSemantics { }
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        // The number is the calendar; without it a shaded square is a square.
+        // Chalk on a trained day so it survives the blue, faint on a rest day.
+        Text(
+            day.dayOfMonth.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (day.trained) Chalk else ChalkFaint
+        )
+    }
+}
+
+/** Tall enough to press without care. The width follows the column. */
+private val CELL_HEIGHT = 40.dp
 
 private const val DAYS_IN_WEEK = 7
 
