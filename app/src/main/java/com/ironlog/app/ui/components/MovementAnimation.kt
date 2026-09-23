@@ -327,6 +327,41 @@ private fun posesFor(pattern: MovementPattern): Pair<Pose, Pose> = when (pattern
         elbow = o(0.30f, 0.44f), hand = o(0.28f, 0.48f)
     )
 
+    MovementPattern.UPRIGHT_ROW -> STANDING.copy(
+        // Bar hanging at the thighs.
+        elbow = o(0.53f, 0.37f), hand = o(0.53f, 0.52f), hasBar = true
+    ) to STANDING.copy(
+        // Pulled to the collarbone with the elbow above the hand, which is the
+        // whole distinction between this and a curl.
+        elbow = o(0.62f, 0.22f), hand = o(0.52f, 0.28f), hasBar = true
+    )
+
+    MovementPattern.PULLOVER -> LYING.copy(
+        // Arms back behind the head, which is where the stretch is.
+        elbow = o(0.18f, 0.34f), hand = o(0.06f, 0.30f)
+    ) to LYING.copy(
+        // Swept over the chest, elbows barely moving.
+        elbow = o(0.28f, 0.34f), hand = o(0.34f, 0.24f)
+    )
+
+    MovementPattern.LEG_CURL -> PRONE to PRONE.copy(
+        // Heels to the backside; everything above the knee stays put.
+        knee = o(0.72f, 0.66f), ankle = o(0.60f, 0.48f)
+    )
+
+    MovementPattern.LEG_EXTENSION -> SEATED to SEATED.copy(
+        // Knee straightens, shin swings forward and up.
+        ankle = o(0.86f, 0.62f)
+    )
+
+    MovementPattern.HIP_ABDUCTION -> SEATED.copy(
+        knee = o(0.62f, 0.66f), ankle = o(0.60f, 0.86f), hasBar = false
+    ) to SEATED.copy(
+        // Side-on, the thigh swinging out reads as the pads opening. It is the
+        // honest limit of a figure drawn from one side.
+        knee = o(0.70f, 0.60f), ankle = o(0.74f, 0.82f), hasBar = false
+    )
+
     MovementPattern.CARRY -> STANDING.copy(
         elbow = o(0.53f, 0.37f), hand = o(0.55f, 0.52f), hasBar = true
     ) to STANDING.copy(
@@ -355,6 +390,36 @@ private val LYING = Pose(
     hand = o(0.34f, 0.46f),
     hasBar = true,
     chestFacing = Offset(0f, -1f),
+    onBench = true
+)
+
+/** Face down on a bench, which is where a leg curl is performed. */
+private val PRONE = Pose(
+    head = o(0.14f, 0.56f),
+    shoulder = o(0.32f, 0.58f),
+    hip = o(0.60f, 0.60f),
+    knee = o(0.76f, 0.62f),
+    ankle = o(0.90f, 0.64f),
+    elbow = o(0.24f, 0.62f),
+    hand = o(0.16f, 0.64f),
+    hasBar = false,
+    // Chest towards the bench, so the hamstrings are marked on the upper side
+    // of the thigh rather than underneath it.
+    chestFacing = Offset(0f, 1f),
+    onBench = true
+)
+
+/** Sitting on a machine, thighs level, shins hanging: leg extensions and the
+ *  hip machines. */
+private val SEATED = Pose(
+    head = o(0.30f, 0.20f),
+    shoulder = o(0.32f, 0.32f),
+    hip = o(0.36f, 0.58f),
+    knee = o(0.64f, 0.60f),
+    ankle = o(0.62f, 0.86f),
+    elbow = o(0.30f, 0.45f),
+    hand = o(0.30f, 0.57f),
+    hasBar = false,
     onBench = true
 )
 
@@ -546,7 +611,10 @@ private fun DrawScope.drawFigure(
         drawCircle(colour, radius = radius * unit, center = at(Offset(p.x + shift.x, p.y + shift.y)))
     }
 
-    val toe = Offset(pose.ankle.x + 0.080f, 0.915f)
+    // Relative to the ankle, not to the floor. Pinned to the floor it stretched
+    // into a flipper the moment a foot left the ground -- on a leg curl, where
+    // the heel finishes by the backside, most of the leg was foot.
+    val toe = Offset(pose.ankle.x + 0.080f, pose.ankle.y + 0.035f)
 
     // The far side first, then the near side over it, which is the order they
     // overlap in from where the viewer is standing.

@@ -51,8 +51,14 @@ class MovementPatternTest {
     }
 
     @Test
-    fun `a leg curl is a hinge, not an arm curl`() {
-        assertEquals(MovementPattern.HINGE, pattern("Lying Leg Curl", MuscleGroup.HAMSTRINGS, ExerciseCategory.MACHINE))
+    fun `a leg curl bends the knee, and is neither an arm curl nor a hinge`() {
+        // It was classified as a hip hinge, which demonstrated a deadlift to
+        // anyone opening a leg curl. The knee is what moves, so it has its own
+        // movement now.
+        assertEquals(
+            MovementPattern.LEG_CURL,
+            pattern("Lying Leg Curl", MuscleGroup.HAMSTRINGS, ExerciseCategory.MACHINE)
+        )
         assertEquals(MovementPattern.CURL, pattern("Hammer Curls", MuscleGroup.BICEPS, ExerciseCategory.DUMBBELL))
     }
 

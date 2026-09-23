@@ -24,11 +24,16 @@ enum class MovementPattern(val label: String, val detail: String) {
     VERTICAL_PRESS("Overhead press", "Press overhead, ribs down, finish with the bar over the ears."),
     HORIZONTAL_PULL("Row", "Pull towards the ribs, shoulder blades back."),
     VERTICAL_PULL("Pulldown", "Pull from overhead to the collarbone, elbows down."),
+    UPRIGHT_ROW("Upright row", "The bar travels up the body, elbows leading above the wrists."),
+    PULLOVER("Pullover", "Arms sweep overhead and back with the elbows nearly fixed."),
     CURL("Curl", "Elbows fixed at the sides, forearms rotate up."),
     EXTENSION("Triceps extension", "Elbows fixed, forearms straighten."),
     LATERAL_RAISE("Raise", "Arms travel out or up with a fixed elbow angle."),
     SHRUG("Shrug", "Shoulders lift straight up, arms stay long."),
     CALF_RAISE("Calf raise", "Heels rise and lower under a straight leg."),
+    LEG_CURL("Leg curl", "Knees bend against the pad, hips stay down."),
+    LEG_EXTENSION("Leg extension", "Seated, knees straighten against the pad."),
+    HIP_ABDUCTION("Hip abduction", "Seated, the thighs drive apart or together against the pads."),
     CORE("Core", "Ribs draw towards the hips against resistance."),
     CARRY("Carry or hold", "Position is held while the body resists moving."),
     CARDIO("Cardio", "Repeated whole-body movement over time.");
@@ -50,31 +55,76 @@ enum class MovementPattern(val label: String, val detail: String) {
         ): MovementPattern {
             val n = name.lowercase()
 
-            // Order matters: the earlier checks are the more specific phrases.
-            // "Calf press" is a calf raise, not a press, so calves come first.
+            // Order matters, and it is the same order as
+            // tools/generate_movement_patterns.py, which decides the shipped
+            // library. The two are kept in step deliberately: a lifter who
+            // writes out "Leg Extension" as their own exercise should get the
+            // same demonstration as the seeded one of the same name.
             return when {
                 category == ExerciseCategory.CARDIO -> CARDIO
+
+                // Names carrying a word that means something else elsewhere.
+                // "Calf press" is a calf raise, "leg curl" is a knee curl, and
+                // "back extension" has nothing to do with the triceps.
                 n.containsAny("calf", "heel raise") -> CALF_RAISE
                 n.containsAny("shrug") -> SHRUG
-                n.containsWord("plank", "carry", "hold", "hang", "farmer") -> CARRY
-                n.containsAny("curl") && !n.contains("leg curl") -> CURL
-                n.containsAny("leg curl") -> HINGE
-                n.containsAny("pushdown", "push-down", "skull", "extension", "kickback", "jm press") -> EXTENSION
-                n.containsAny("lateral raise", "front raise", "side raise", "fly", "flye", "reverse fly", "raise") &&
-                    !n.containsAny("calf", "leg raise", "knee raise", "hip raise") -> LATERAL_RAISE
+                n.containsAny("leg curl", "hamstring curl", "lying curl") -> LEG_CURL
+                n.containsAny("leg extension", "knee extension") -> LEG_EXTENSION
+                n.containsAny("pullover") -> PULLOVER
+                n.containsAny("upright row", "sumo high") || n.containsPhrase("high pull") -> UPRIGHT_ROW
+                n.containsAny("abduct", "adduct") -> HIP_ABDUCTION
+                n.containsAny("back extension", "hyperextension", "hyper extension") -> HINGE
+                n.containsAny("kickback") -> if (primaryMuscle == MuscleGroup.TRICEPS) EXTENSION else HINGE
+
+                // A step-up with a knee raise is still a step-up, so the legs
+                // are claimed before the trunk rules can take the phrase.
                 n.containsAny("lunge", "split squat", "step up", "step-up") -> LUNGE
+
+                n.containsAny("rollout", "roll-out", "ab wheel") -> CORE
+                n.containsAny(
+                    "crunch", "sit-up", "sit up", "situp", "twist", "leg raise", "knee raise",
+                    "jackknife", "flutter", "leg lift", "leg pull", "judo flip", "cable lift",
+                    "elbow to knee", "hip raise", "woodchop", "v-up"
+                ) -> CORE
+                n.containsAny("plank") -> CARRY
+
+                // The Olympic lifts, before "hang" reads as a hold.
+                n.containsWord("clean", "snatch", "jerk") -> HINGE
+                n.containsWord("carry", "hold", "hang", "farmer", "farmers") -> CARRY
+
+                n.containsAny("curl") -> CURL
+                n.containsAny(
+                    "pushdown", "push-down", "skull", "jm press", "triceps extension",
+                    "tricep extension", "overhead extension", "french press"
+                ) -> EXTENSION
+
+                // A rear delt row is a row; only the fly version is a raise.
+                !n.containsWord("row") && n.containsAny(
+                    "fly", "flye", "around the world", "rear delt", "lateral raise",
+                    "front raise", "side raise", "shoulder raise"
+                ) -> LATERAL_RAISE
+                !n.containsWord("row") && n.contains("raise") &&
+                    !n.containsAny("calf", "leg raise", "knee raise", "hip raise") -> LATERAL_RAISE
+
                 n.containsAny("squat", "leg press", "hack") -> SQUAT
                 n.containsAny(
-                    "deadlift", "good morning", "hinge", "swing", "snatch",
-                    "pull through", "hip thrust", "bridge", "rdl"
-                ) || n.containsWord("clean") -> HINGE
+                    "deadlift", "good morning", "hinge", "swing", "hip thrust", "bridge",
+                    "rdl", "rack pull", "pull through", "pull-through", "stiff leg",
+                    "stiff-leg", "butt lift", "back raise"
+                ) -> HINGE
+
                 n.containsWord("row") || n.contains("face pull") -> HORIZONTAL_PULL
                 n.containsAny("pulldown", "pull-down", "pullup", "pull-up", "pull up") ||
                     n.containsWord("chin", "chins", "chinup") -> VERTICAL_PULL
-                n.containsAny("overhead press", "shoulder press", "military", "push press", "jerk", "landmine press") -> VERTICAL_PRESS
-                n.containsAny("bench", "chest press", "push up", "push-up", "pushup", "floor press") ||
-                    n.containsWord("dip", "dips") -> HORIZONTAL_PRESS
-                n.containsAny("crunch", "sit-up", "sit up", "twist", "leg raise", "knee raise", "rollout", "jackknife", "flutter", "leg lift", "leg pull") -> CORE
+
+                n.containsAny(
+                    "overhead press", "shoulder press", "military", "push press",
+                    "landmine press", "jammer", "arnold", "bradford", "cuban press", "overhead"
+                ) -> VERTICAL_PRESS
+                n.containsAny(
+                    "bench", "chest press", "push up", "push-up", "pushup",
+                    "floor press", "pin press", "board press", "neck press"
+                ) || n.containsWord("dip", "dips") -> HORIZONTAL_PRESS
                 n.contains("press") -> if (primaryMuscle == MuscleGroup.SHOULDERS) VERTICAL_PRESS else HORIZONTAL_PRESS
                 n.contains("pull") -> VERTICAL_PULL
 
@@ -83,13 +133,15 @@ enum class MovementPattern(val label: String, val detail: String) {
                 else -> when (primaryMuscle) {
                     MuscleGroup.CHEST -> HORIZONTAL_PRESS
                     MuscleGroup.SHOULDERS -> VERTICAL_PRESS
-                    MuscleGroup.BACK, MuscleGroup.TRAPS -> HORIZONTAL_PULL
+                    MuscleGroup.BACK -> HORIZONTAL_PULL
+                    MuscleGroup.TRAPS -> SHRUG
                     MuscleGroup.LATS -> VERTICAL_PULL
                     MuscleGroup.BICEPS -> CURL
                     MuscleGroup.TRICEPS -> EXTENSION
                     MuscleGroup.FOREARMS -> CURL
                     MuscleGroup.QUADS -> SQUAT
-                    MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES -> HINGE
+                    MuscleGroup.HAMSTRINGS -> LEG_CURL
+                    MuscleGroup.GLUTES -> HINGE
                     MuscleGroup.CALVES -> CALF_RAISE
                     MuscleGroup.ABS -> CORE
                     MuscleGroup.FULL_BODY -> HINGE
@@ -101,6 +153,14 @@ enum class MovementPattern(val label: String, val detail: String) {
         private fun String.containsAny(vararg needles: String) = needles.any { contains(it) }
 
         /**
+         * A phrase bounded by word edges. "High pull" sits inside "Kneeling
+         * High Pulley Row", which is a row off a high pulley and not a high
+         * pull at all.
+         */
+        private fun String.containsPhrase(phrase: String) =
+            Regex("\\b${Regex.escape(phrase)}s?\\b").containsMatchIn(this)
+
+        /**
          * Whole words only.
          *
          * Short tokens are dangerous as substrings: "chin" sits inside
@@ -109,7 +169,9 @@ enum class MovementPattern(val label: String, val detail: String) {
          */
         private fun String.containsWord(vararg needles: String): Boolean {
             val words = split(Regex("[^a-z0-9]+"))
-            return needles.any { it in words }
+            // Plurals count: "Elevated Cable Rows" is as much a row as
+            // "Cable Row", and missing that sent it to the wrong animation.
+            return needles.any { it in words || "${it}s" in words || "${it}es" in words }
         }
     }
 }
