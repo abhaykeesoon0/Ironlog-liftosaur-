@@ -58,6 +58,32 @@ data class ExerciseSessionPoint(
 )
 data class ExerciseFrequency(val exerciseId: String, val name: String, val sessions: Int)
 
+/** How many working sets were performed at a given number of repetitions. */
+data class RepCount(val reps: Int, val sets: Int)
+
+/**
+ * Everything that was lifted inside one window of time.
+ *
+ * Read for two windows of equal length -- the period on screen and the period
+ * before it -- so the app can say whether the training is going anywhere rather
+ * than only what it currently is.
+ */
+data class TrainingTotals(
+    val workouts: Int,
+    val volumeKg: Double,
+    val sets: Int,
+    val reps: Int,
+    val averageWeightKg: Double,
+    val bestWeightKg: Double
+) {
+    val isEmpty: Boolean get() = workouts == 0 && sets == 0
+
+    companion object {
+        /** A window with nothing in it, for a signed-out user or an unused period. */
+        val NONE = TrainingTotals(0, 0.0, 0, 0, 0.0, 0.0)
+    }
+}
+
 data class HistoricSet(
     @Embedded val set: WorkoutSetEntity,
     val workoutId: String,

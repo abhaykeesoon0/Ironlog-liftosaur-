@@ -33,6 +33,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ironlog.app.ui.components.BarChart
+import com.ironlog.app.ui.components.Comparison
+import com.ironlog.app.ui.components.ComparisonBars
+import com.ironlog.app.ui.components.DonutChart
+import com.ironlog.app.ui.components.FlowStep
+import com.ironlog.app.ui.components.Histogram
+import com.ironlog.app.ui.components.LineChart
+import com.ironlog.app.ui.components.ProgressionFlow
 import com.ironlog.app.ui.components.Caption
 import com.ironlog.app.ui.components.ChartPoint
 import com.ironlog.app.ui.components.EmptyState
@@ -45,7 +52,10 @@ import com.ironlog.app.ui.components.ProportionBars
 import com.ironlog.app.ui.components.ScreenTitle
 import com.ironlog.app.ui.components.SectionHeader
 import com.ironlog.app.ui.components.StatTile
+import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.ui.format.formatRelativeDay
+import com.ironlog.app.ui.format.formatShortDate
+import com.ironlog.app.ui.format.formatWeight
 import com.ironlog.app.ui.format.formatVolume
 import com.ironlog.app.ui.screens.exercises.formatRecordContext
 import com.ironlog.app.ui.screens.exercises.formatRecordValue
@@ -57,6 +67,7 @@ import com.ironlog.app.ui.theme.NumericType
 import com.ironlog.app.ui.theme.Plate10
 import com.ironlog.app.ui.theme.Plate15
 import com.ironlog.app.ui.theme.Plate20
+import com.ironlog.app.ui.theme.Plate25
 import com.ironlog.app.ui.theme.Space
 import com.ironlog.app.ui.theme.Touch
 
@@ -133,6 +144,29 @@ fun ProgressScreen(
                     }
                 }
 
+                state.comparison?.let { comparison ->
+                    item { SectionHeader("Against the ${state.range.label} before") }
+                    item {
+                        IronCard {
+                            Column {
+                                if (comparison.hasBefore) {
+                                    Caption(
+                                        "The same measures over the previous ${state.range.label}, so a " +
+                                            "heavier block shows as a longer bar rather than a bigger number."
+                                    )
+                                    Spacer(Modifier.height(Space.md))
+                                    ComparisonBars(rows = comparisonRows(comparison, state.unit))
+                                } else {
+                                    Caption(
+                                        "Nothing logged before this period yet, so there is nothing to " +
+                                            "compare against. Keep training and this fills in."
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (state.muscles.isNotEmpty()) {
                     item { SectionHeader("Muscle split") }
                     item {
@@ -140,10 +174,79 @@ fun ProgressScreen(
                             Column {
                                 Caption("Working volume by primary muscle. Warm-ups are excluded.")
                                 Spacer(Modifier.height(Space.md))
+                                // The ring answers "what is this training mostly
+                                // for"; the bars underneath answer "by how much",
+                                // which slices a few degrees apart cannot.
+                                DonutChart(
+                                    items = state.muscles.take(6)
+                                        .map { ChartPoint(it.label, it.volumeKg.toFloat()) },
+                                    centreValue = state.unit.formatVolume(state.totalVolumeKg),
+                                    centreLabel = "total",
+                                    description = "Share of volume by muscle"
+                                )
+                                Spacer(Modifier.height(Space.lg))
                                 ProportionBars(
                                     items = state.muscles.map { ChartPoint(it.label, it.volumeKg.toFloat()) },
                                     colors = ChartSeries,
                                     valueFormatter = { state.unit.formatVolume(it.toDouble()) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (state.repBands.isNotEmpty()) {
+                    item { SectionHeader("Rep ranges") }
+                    item {
+                        IronCard {
+                            Column {
+                                Caption("Every working set, counted by how many reps it was taken for.")
+                                Spacer(Modifier.height(Space.md))
+                                Histogram(
+                                    bins = state.repBands.map { ChartPoint(it.label, it.sets.toFloat()) },
+                                    valueFormatter = { "${it.toInt()} sets" },
+                                    description = "Sets by rep range"
+                                )
+                                state.repBands.maxByOrNull { it.sets }?.let { band ->
+                                    Spacer(Modifier.height(Space.sm))
+                                    Caption(
+                                        "Most of your work sits at ${band.label} reps, which is " +
+                                            "${band.note.lowercase()} territory."
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                state.topLift?.takeIf { it.sessions.size > 1 }?.let { lift ->
+                    item { SectionHeader("How ${lift.name} has moved") }
+                    item {
+                        IronCard(onClick = { onOpenExercise(lift.exerciseId) }) {
+                            Column {
+                                Caption("Heaviest set in each session, oldest first.")
+                                Spacer(Modifier.height(Space.md))
+                                LineChart(
+                                    points = lift.sessions.takeLast(12).map { session ->
+                                        ChartPoint(
+                                            formatShortDate(session.startedAt),
+                                            session.bestWeight.toFloat()
+                                        )
+                                    },
+                                    color = Plate25,
+                                    valueFormatter = { state.unit.formatWeight(it.toDouble()) },
+                                    description = "Heaviest set per session for ${lift.name}"
+                                )
+                                Spacer(Modifier.height(Space.lg))
+                                Text(
+                                    "Session by session",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = ChalkDim
+                                )
+                                Spacer(Modifier.height(Space.sm))
+                                ProgressionFlow(
+                                    steps = flowSteps(lift, state.unit),
+                                    description = "${lift.name} session by session"
                                 )
                             }
                         }
@@ -273,5 +376,61 @@ private fun EntryCard(icon: ImageVector, title: String, subtitle: String, onClic
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
         }
+    }
+}
+
+/**
+ * The measures worth setting against an earlier block of training.
+ *
+ * Six of them rather than one: volume alone can rise because the sessions got
+ * longer, and load alone can rise because the sets got shorter. Together they
+ * say which it was.
+ */
+private fun comparisonRows(comparison: PeriodComparison, unit: UnitSystem): List<Comparison> {
+    val now = comparison.now
+    val before = comparison.before
+    return listOf(
+        Comparison(
+            "Volume", now.volumeKg.toFloat(), before.volumeKg.toFloat(),
+            unit.formatVolume(now.volumeKg), unit.formatVolume(before.volumeKg)
+        ),
+        Comparison(
+            "Working sets", now.sets.toFloat(), before.sets.toFloat(),
+            "%,d".format(now.sets), "%,d".format(before.sets)
+        ),
+        Comparison(
+            "Reps", now.reps.toFloat(), before.reps.toFloat(),
+            "%,d".format(now.reps), "%,d".format(before.reps)
+        ),
+        Comparison(
+            "Average load", now.averageWeightKg.toFloat(), before.averageWeightKg.toFloat(),
+            unit.formatWeight(now.averageWeightKg), unit.formatWeight(before.averageWeightKg)
+        ),
+        Comparison(
+            "Heaviest set", now.bestWeightKg.toFloat(), before.bestWeightKg.toFloat(),
+            unit.formatWeight(now.bestWeightKg), unit.formatWeight(before.bestWeightKg)
+        ),
+        Comparison(
+            "Workouts", now.workouts.toFloat(), before.workouts.toFloat(),
+            "%,d".format(now.workouts), "%,d".format(before.workouts)
+        )
+    )
+}
+
+/**
+ * The last few sessions of one lift as a chain, newest last.
+ *
+ * Six rungs: enough to see a direction, few enough that the card does not turn
+ * into the workout history it links to.
+ */
+private fun flowSteps(lift: TopLift, unit: UnitSystem): List<FlowStep> {
+    val best = lift.sessions.maxOfOrNull { it.bestWeight } ?: 0.0
+    return lift.sessions.takeLast(6).map { session ->
+        FlowStep(
+            load = unit.formatWeight(session.bestWeight),
+            detail = "for ${session.bestReps} reps",
+            date = formatShortDate(session.startedAt),
+            isBest = best > 0.0 && session.bestWeight >= best
+        )
     }
 }

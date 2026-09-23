@@ -141,6 +141,53 @@ interface WorkoutDao {
     )
     fun observeMuscleSplit(userId: String, since: Long): Flow<List<MuscleVolume>>
 
+    /**
+     * Working sets grouped by how many repetitions they were taken for.
+     *
+     * Binned into ranges in Kotlin rather than in SQL: the boundaries between
+     * strength, size and endurance work are a training decision, and they do
+     * not belong in a query.
+     */
+    @Query(
+        """
+        SELECT COALESCE(s.reps, 0) AS reps, COUNT(*) AS sets
+        FROM workout_sets s
+        JOIN workout_exercises we ON we.id = s.workoutExerciseId
+        JOIN workouts w ON w.id = we.workoutId
+        WHERE w.userId = :userId AND w.finishedAt IS NOT NULL
+          AND w.startedAt >= :since AND s.isCompleted = 1 AND s.type != 'WARMUP'
+          AND COALESCE(s.reps, 0) > 0
+        GROUP BY reps
+        ORDER BY reps ASC
+        """
+    )
+    fun observeRepCounts(userId: String, since: Long): Flow<List<RepCount>>
+
+    /**
+     * What was lifted between two instants.
+     *
+     * The average is over sets that carried a weight, so a set of chin-ups does
+     * not drag the average load towards zero.
+     */
+    @Query(
+        """
+        SELECT COUNT(DISTINCT w.id) AS workouts,
+               COALESCE(SUM(CASE WHEN s.type != 'WARMUP'
+                    THEN COALESCE(s.weightKg, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0) AS volumeKg,
+               COALESCE(SUM(CASE WHEN s.type != 'WARMUP' THEN 1 ELSE 0 END), 0) AS sets,
+               COALESCE(SUM(CASE WHEN s.type != 'WARMUP' THEN COALESCE(s.reps, 0) ELSE 0 END), 0) AS reps,
+               COALESCE(AVG(CASE WHEN s.type != 'WARMUP' AND COALESCE(s.weightKg, 0) > 0
+                    THEN s.weightKg END), 0) AS averageWeightKg,
+               COALESCE(MAX(CASE WHEN s.type != 'WARMUP' THEN s.weightKg END), 0) AS bestWeightKg
+        FROM workout_sets s
+        JOIN workout_exercises we ON we.id = s.workoutExerciseId
+        JOIN workouts w ON w.id = we.workoutId
+        WHERE w.userId = :userId AND w.finishedAt IS NOT NULL AND s.isCompleted = 1
+          AND w.startedAt >= :from AND w.startedAt < :to
+        """
+    )
+    fun observeTotals(userId: String, from: Long, to: Long): Flow<TrainingTotals>
+
     /** Per-session bests for one exercise, used by the exercise progress chart. */
     @Query(
         """
