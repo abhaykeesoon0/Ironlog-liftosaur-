@@ -27,6 +27,10 @@ import com.ironlog.app.data.entity.UserEntity
 import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.entity.WorkoutExerciseEntity
 import com.ironlog.app.data.entity.WorkoutSetEntity
+import com.ironlog.app.data.dao.NutritionDao
+import com.ironlog.app.data.entity.FoodEntity
+import com.ironlog.app.data.entity.FoodLogEntity
+import com.ironlog.app.data.entity.NutritionGoalEntity
 
 /**
  * The database file lives in internal app storage, which the Android sandbox
@@ -50,9 +54,12 @@ import com.ironlog.app.data.entity.WorkoutSetEntity
         DailyActivityEntity::class,
         StrengthGoalEntity::class,
         QuestClaimEntity::class,
-        StorePurchaseEntity::class
+        StorePurchaseEntity::class,
+        FoodEntity::class,
+        FoodLogEntity::class,
+        NutritionGoalEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -66,6 +73,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun cardioDao(): CardioDao
     abstract fun strengthGoalDao(): StrengthGoalDao
     abstract fun rewardsDao(): RewardsDao
+    abstract fun nutritionDao(): NutritionDao
 
     companion object {
         const val NAME = "ironlog.db"

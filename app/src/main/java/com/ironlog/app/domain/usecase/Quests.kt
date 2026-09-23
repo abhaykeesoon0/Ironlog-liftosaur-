@@ -59,6 +59,7 @@ object Quests {
         Quest("daily_warmup", "Warm up properly", "Log two warm-up sets before the work", Period.DAILY, 2.0, 15),
         Quest("daily_bodyweight", "Step on the scale", "Log your bodyweight today", Period.DAILY, 1.0, 10),
         Quest("daily_steps", "Get moving", "8,000 steps today", Period.DAILY, 8_000.0, 20, Unit.STEPS),
+        Quest("daily_meals", "Fuel the work", "Log three meals today", Period.DAILY, 3.0, 15),
 
         // ------------------------------------------------------------ weekly
         Quest("weekly_three", "Three sessions", "Train three times this week", Period.WEEKLY, 3.0, 60),
@@ -70,6 +71,7 @@ object Quests {
         Quest("weekly_cardio", "Get outside", "Record one outdoor cardio session", Period.WEEKLY, 1.0, 40),
         Quest("weekly_steps", "Fifty thousand", "50,000 steps this week", Period.WEEKLY, 50_000.0, 60, Unit.STEPS),
         Quest("weekly_new_exercise", "Try something new", "Log an exercise you have never done", Period.WEEKLY, 1.0, 30),
+        Quest("weekly_meals", "Keep the log", "Log food on five days this week", Period.WEEKLY, 5.0, 50),
 
         // ----------------------------------------------------------- monthly
         Quest("monthly_twelve", "A solid month", "Twelve sessions this month", Period.MONTHLY, 12.0, 200),
@@ -98,6 +100,8 @@ object Quests {
         val warmupSetsToday: Int = 0,
         val bodyweightLoggedToday: Boolean = false,
         val stepsToday: Int = 0,
+        val mealsLoggedToday: Int = 0,
+        val daysLoggedThisWeek: Int = 0,
         val workoutsThisWeek: Int = 0,
         val recordsThisWeek: Int = 0,
         val musclesThisWeek: Int = 0,
@@ -155,6 +159,8 @@ object Quests {
         "daily_warmup" -> inputs.warmupSetsToday.toDouble()
         "daily_bodyweight" -> if (inputs.bodyweightLoggedToday) 1.0 else 0.0
         "daily_steps" -> inputs.stepsToday.toDouble()
+        "daily_meals" -> inputs.mealsLoggedToday.toDouble()
+        "weekly_meals" -> inputs.daysLoggedThisWeek.toDouble()
         "weekly_three", "weekly_five" -> inputs.workoutsThisWeek.toDouble()
         "weekly_records" -> inputs.recordsThisWeek.toDouble()
         "weekly_muscles" -> inputs.musclesThisWeek.toDouble()

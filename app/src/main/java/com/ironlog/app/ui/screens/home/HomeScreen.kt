@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.ui.platform.LocalContext
+import kotlin.math.roundToInt
 import com.ironlog.app.core.sensors.HealthConnectSteps
 import com.ironlog.app.data.entity.StepSource
 import com.ironlog.app.core.permissions.AppPermission
@@ -92,6 +93,8 @@ import com.ironlog.app.ui.theme.Space
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import com.ironlog.app.ui.screens.rewards.titleText
+import androidx.compose.material.icons.filled.Restaurant
+import com.ironlog.app.ui.screens.nutrition.NutritionViewModel
 
 @Composable
 fun HomeScreen(
@@ -103,6 +106,7 @@ fun HomeScreen(
     onOpenGoals: () -> Unit,
     onOpenQuests: () -> Unit,
     onOpenCoach: () -> Unit,
+    onOpenNutrition: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
     goalsViewModel: HomeGoalsViewModel = hiltViewModel(),
     questsViewModel: QuestsViewModel = hiltViewModel(),
@@ -273,6 +277,9 @@ fun HomeScreen(
                 }
             }
         }
+
+        Spacer(Modifier.height(Space.md))
+        NutritionCard(onOpen = onOpenNutrition)
 
         Spacer(Modifier.height(Space.md))
         IronCard(onClick = onOpenCardio) {
@@ -757,4 +764,35 @@ private fun String.toDisplayKg(unit: UnitSystem): Double? {
     val entered = trim().replace(',', '.').toDoubleOrNull() ?: return null
     if (entered <= 0) return null
     return if (unit == UnitSystem.METRIC) entered else TrainingMath.lbToKg(entered)
+}
+
+/**
+ * Today's energy against the target, as a card that opens the food log.
+ *
+ * Reads its own view model rather than adding to the Home one, the same way
+ * the quests and the equipped items do: the Home screen composes what the
+ * home screen shows, and each card knows its own business.
+ */
+@Composable
+private fun NutritionCard(onOpen: () -> Unit, viewModel: NutritionViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val kcal = state.totals.kcal.roundToInt()
+    val target = state.goal?.targetKcal
+    IronCard(onClick = onOpen) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Restaurant, contentDescription = null, tint = Chalk)
+            Spacer(Modifier.width(Space.md))
+            Column(Modifier.weight(1f)) {
+                Text("Nutrition", style = MaterialTheme.typography.titleMedium, color = Chalk)
+                Caption(
+                    when {
+                        target == null && kcal == 0 -> "Log meals and set a goal"
+                        target == null -> "$kcal kcal logged today"
+                        else -> "$kcal of $target kcal today"
+                    }
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
+        }
+    }
 }

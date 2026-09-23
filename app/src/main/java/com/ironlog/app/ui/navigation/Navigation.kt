@@ -60,6 +60,8 @@ import com.ironlog.app.ui.theme.Chalk
 import com.ironlog.app.ui.theme.ChalkFaint
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Slate800
+import com.ironlog.app.ui.screens.nutrition.NutritionScreen
+import com.ironlog.app.ui.screens.nutrition.PlanScreen
 
 object Routes {
     const val SIGN_IN = "auth/sign-in"
@@ -88,6 +90,8 @@ object Routes {
     const val CARDIO_TRACK = "cardio/track"
     const val CARDIO_SESSION = "cardio/session/{id}"
     const val SETTINGS = "settings"
+    const val NUTRITION = "nutrition"
+    const val NUTRITION_PLAN = "nutrition/plan"
     const val CHANGE_PASSWORD = "settings/password"
 
     fun routineEdit(id: String?) = if (id == null) "routines/edit" else "routines/edit?id=$id"
@@ -196,7 +200,8 @@ fun MainNavHost(
                     onOpenBody = { navController.navigate(Routes.BODY) },
                     onOpenGoals = { navController.navigate(Routes.STRENGTH_GOALS) },
                     onOpenQuests = { navController.navigate(Routes.QUESTS) },
-                    onOpenCoach = { navController.navigate(Routes.COACH) }
+                    onOpenCoach = { navController.navigate(Routes.COACH) },
+                    onOpenNutrition = { navController.navigate(Routes.NUTRITION) }
                 )
             }
             composable(Routes.ROUTINES) {
@@ -220,6 +225,7 @@ fun MainNavHost(
             composable(Routes.PROFILE) {
                 ProfileScreen(
                     onOpenBody = { navController.navigate(Routes.BODY) },
+                    onOpenNutrition = { navController.navigate(Routes.NUTRITION) },
                     onOpenPhotos = { navController.navigate(Routes.PHOTOS) },
                     onOpenCardio = { navController.navigate(Routes.CARDIO) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
@@ -320,6 +326,13 @@ fun MainNavHost(
 
             // --------------------------------------------------- body + cardio
             composable(Routes.BODY) { BodyScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.NUTRITION) {
+                NutritionScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPlan = { navController.navigate(Routes.NUTRITION_PLAN) }
+                )
+            }
+            composable(Routes.NUTRITION_PLAN) { PlanScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.PHOTOS) { PhotosScreen(onBack = { navController.popBackStack() }) }
             composable(Routes.CARDIO) {
                 CardioScreen(

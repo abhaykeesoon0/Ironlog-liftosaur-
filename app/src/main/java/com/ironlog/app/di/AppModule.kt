@@ -52,6 +52,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import javax.inject.Qualifier
 import javax.inject.Singleton
+import com.ironlog.app.data.dao.NutritionDao
+import com.ironlog.app.data.repository.NutritionRepository
+import com.ironlog.app.data.repository.NutritionRepositoryImpl
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -72,7 +75,7 @@ object DatabaseModule {
             // No destructive fallback: silently wiping a user's training history
             // on a schema change would be a data-loss bug, not a convenience.
             // Migrations are added explicitly when the schema moves.
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
 
     /**
@@ -83,6 +86,72 @@ object DatabaseModule {
      * [com.ironlog.app.data.entity.StrengthGoalEntity] exactly, or Room's
      * identity check fails at open time on an upgraded install.
      */
+    /**
+     * Adds the food library, the food log and the nutrition goal. Additive,
+     * like the two before it: nothing existing is read, rewritten or dropped.
+     * The library itself is seeded by the application on launch, the same way
+     * the exercise library is, so this only makes room for it.
+     */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `foods` (
+                    `id` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `group` TEXT NOT NULL,
+                    `kcalPer100g` REAL NOT NULL,
+                    `proteinPer100g` REAL NOT NULL,
+                    `carbsPer100g` REAL NOT NULL,
+                    `fatPer100g` REAL NOT NULL,
+                    `servingGrams` REAL NOT NULL,
+                    `servingLabel` TEXT NOT NULL,
+                    `ownerUserId` TEXT,
+                    `isCustom` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `food_logs` (
+                    `id` TEXT NOT NULL,
+                    `userId` TEXT NOT NULL,
+                    `foodId` TEXT NOT NULL,
+                    `grams` REAL NOT NULL,
+                    `meal` TEXT NOT NULL,
+                    `loggedAt` INTEGER NOT NULL,
+                    `note` TEXT NOT NULL,
+                    PRIMARY KEY(`id`),
+                    FOREIGN KEY(`userId`) REFERENCES `users`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_food_logs_userId_loggedAt` ON `food_logs` (`userId`, `loggedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_food_logs_foodId` ON `food_logs` (`foodId`)")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `nutrition_goals` (
+                    `userId` TEXT NOT NULL,
+                    `goal` TEXT NOT NULL,
+                    `sex` TEXT NOT NULL,
+                    `ageYears` INTEGER NOT NULL,
+                    `activity` TEXT NOT NULL,
+                    `targetKcal` INTEGER NOT NULL,
+                    `proteinG` INTEGER NOT NULL,
+                    `carbsG` INTEGER NOT NULL,
+                    `fatG` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`userId`),
+                    FOREIGN KEY(`userId`) REFERENCES `users`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
     val MIGRATION_1_2 = object : Migration(1, 2) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -180,6 +249,7 @@ object DatabaseModule {
     @Provides fun provideCardioDao(db: AppDatabase): CardioDao = db.cardioDao()
     @Provides fun provideStrengthGoalDao(db: AppDatabase): StrengthGoalDao = db.strengthGoalDao()
     @Provides fun provideRewardsDao(db: AppDatabase): RewardsDao = db.rewardsDao()
+    @Provides fun provideNutritionDao(db: AppDatabase): NutritionDao = db.nutritionDao()
 
     /** Non-sensitive preferences only; session secrets live in SecureTokenStore. */
     @Provides
@@ -236,6 +306,9 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindCardioRepository(impl: CardioRepositoryImpl): CardioRepository
+
+    @Binds @Singleton
+    abstract fun bindNutritionRepository(impl: NutritionRepositoryImpl): NutritionRepository
 
     @Binds @Singleton
     abstract fun bindProfileRepository(impl: ProfileRepositoryImpl): ProfileRepository
