@@ -5,6 +5,8 @@ import com.ironlog.app.core.database.AppDatabase
 import com.ironlog.app.core.security.Validators
 import com.ironlog.app.data.dao.ExerciseDao
 import com.ironlog.app.data.dao.MuscleVolume
+import com.ironlog.app.data.dao.RepCount
+import com.ironlog.app.data.dao.TrainingTotals
 import com.ironlog.app.data.dao.PersonalRecordDao
 import com.ironlog.app.data.dao.RecordWithExercise
 import com.ironlog.app.data.dao.RoutineDao
@@ -78,6 +80,8 @@ interface WorkoutRepository {
     fun observeVolumeSince(since: Long): Flow<Double>
     fun observeDailyVolume(since: Long): Flow<List<VolumePoint>>
     fun observeMuscleSplit(since: Long): Flow<List<MuscleVolume>>
+    fun observeRepCounts(since: Long): Flow<List<RepCount>>
+    fun observeTotals(from: Long, to: Long): Flow<TrainingTotals>
     fun observeRecentRecords(limit: Int = 30): Flow<List<RecordWithExercise>>
     fun observeRecordCount(): Flow<Int>
 
@@ -147,6 +151,12 @@ class WorkoutRepositoryImpl @Inject constructor(
 
     override fun observeMuscleSplit(since: Long): Flow<List<MuscleVolume>> =
         currentUser.idOrNull()?.let { workoutDao.observeMuscleSplit(it, since) } ?: flowOf(emptyList())
+
+    override fun observeRepCounts(since: Long): Flow<List<RepCount>> =
+        currentUser.idOrNull()?.let { workoutDao.observeRepCounts(it, since) } ?: flowOf(emptyList())
+
+    override fun observeTotals(from: Long, to: Long): Flow<TrainingTotals> =
+        currentUser.idOrNull()?.let { workoutDao.observeTotals(it, from, to) } ?: flowOf(TrainingTotals.NONE)
 
     override fun observeRecentRecords(limit: Int): Flow<List<RecordWithExercise>> =
         currentUser.idOrNull()?.let { recordDao.observeRecentWithNames(it, limit) } ?: flowOf(emptyList())
