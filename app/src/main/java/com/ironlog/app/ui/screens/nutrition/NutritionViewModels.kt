@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.ironlog.app.data.repository.ScanResult
 
 data class NutritionUiState(
     val isLoading: Boolean = true,
@@ -30,6 +31,7 @@ data class NutritionUiState(
     val today: List<FoodLogWithFood> = emptyList(),
     val foods: List<FoodEntity> = emptyList(),
     val profile: UserEntity? = null,
+    val isScanning: Boolean = false,
     val error: String? = null,
     val message: String? = null
 ) {
@@ -61,7 +63,7 @@ class NutritionViewModel @Inject constructor(
                 NutritionUiState(isLoading = false, goal = goal, today = today, foods = foods, profile = user)
             }
                 .catch { e -> _state.update { it.copy(isLoading = false, error = e.userMessage("Could not load your food log")) } }
-                .collect { next -> _state.update { next.copy(error = it.error, message = it.message) } }
+                .collect { next -> _state.update { next.copy(error = it.error, message = it.message, isScanning = it.isScanning) } }
         }
     }
 
@@ -96,6 +98,17 @@ class NutritionViewModel @Inject constructor(
                     onSaved()
                 }
                 .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not save the goal")) } }
+        }
+    }
+
+    /** Resolves a barcode and hands back either the known food or a form to confirm. */
+    fun scan(barcode: String, onResult: (ScanResult) -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isScanning = true) }
+            repository.scan(barcode)
+                .onSuccess(onResult)
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not look that barcode up")) } }
+            _state.update { it.copy(isScanning = false) }
         }
     }
 

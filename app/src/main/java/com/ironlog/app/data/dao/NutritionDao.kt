@@ -40,6 +40,10 @@ interface NutritionDao {
     @Query("SELECT * FROM foods WHERE id = :id LIMIT 1")
     suspend fun findFood(id: String): FoodEntity?
 
+    /** A food already scanned from this code, shared or the user's own. */
+    @Query("SELECT * FROM foods WHERE barcode = :barcode AND (ownerUserId IS NULL OR ownerUserId = :userId) LIMIT 1")
+    suspend fun findByBarcode(userId: String, barcode: String): FoodEntity?
+
     @Upsert suspend fun upsertLog(item: FoodLogEntity)
 
     @Query("DELETE FROM food_logs WHERE id = :id AND userId = :userId")

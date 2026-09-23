@@ -74,7 +74,9 @@ data class FoodEntity(
     val servingLabel: String,
     /** Seeded foods have no owner and are shared; a custom food belongs to one user. */
     val ownerUserId: String? = null,
-    val isCustom: Boolean = false
+    val isCustom: Boolean = false,
+    /** The product code it was scanned from, so the same label is looked up once. */
+    val barcode: String? = null
 )
 
 @Entity(
