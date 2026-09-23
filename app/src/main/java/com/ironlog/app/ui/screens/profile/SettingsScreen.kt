@@ -71,6 +71,7 @@ import com.ironlog.app.ui.theme.Danger
 import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.theme.Space
 import com.ironlog.app.ui.theme.Touch
+import com.ironlog.app.data.entity.MuscleTint
 
 @Composable
 fun SettingsScreen(
@@ -82,6 +83,7 @@ fun SettingsScreen(
     val reminder by viewModel.reminder.collectAsStateWithLifecycle()
     val welcomeSound by viewModel.welcomeSound.collectAsStateWithLifecycle()
     val equipment by viewModel.equipment.collectAsStateWithLifecycle()
+    val muscleTint by viewModel.muscleTint.collectAsStateWithLifecycle()
     val stepSource by viewModel.stepSource.collectAsStateWithLifecycle()
     var assistantKey by remember { mutableStateOf("") }
     var keySaved by remember { mutableStateOf(viewModel.hasAssistantKey()) }
@@ -238,6 +240,29 @@ fun SettingsScreen(
                             Modifier.padding(top = Space.xs)
                         )
                     }
+                }
+            }
+
+            // --------------------------------------------------------- appearance
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Appearance")
+            IronCard {
+                Column {
+                    Text("Trained muscles", style = MaterialTheme.typography.bodyLarge, color = Chalk)
+                    Spacer(Modifier.height(Space.sm))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        MuscleTint.entries.forEach { option ->
+                            IronChip(
+                                text = option.label,
+                                selected = muscleTint == option,
+                                onClick = { viewModel.setMuscleTint(option) }
+                            )
+                        }
+                    }
+                    Caption(
+                        "The colour the figure on the workout screen fills a worked muscle with.",
+                        Modifier.padding(top = Space.xs)
+                    )
                 }
             }
 

@@ -54,6 +54,25 @@ import com.ironlog.app.ui.theme.Space
  * outlines curve like a body instead of stacking rectangles.
  */
 
+/**
+ * The colours a figure is drawn in, apart from the muscles being read.
+ *
+ * The recovery chart is a dark body on a dark card, so the shaded muscles
+ * are the only bright thing. The training figure is the opposite: a light
+ * body, as on a printed anatomy chart, with the worked muscles filled in a
+ * colour of the user's choosing. Same anatomy, different paper.
+ */
+data class FigurePalette(val body: Color, val idle: Color, val outline: Color) {
+    companion object {
+        val DARK = FigurePalette(body = BODY, idle = IDLE_MUSCLE, outline = Slate800)
+        val LIGHT = FigurePalette(
+            body = Color(0xFFB9C2CB),
+            idle = Color(0xFFD4DAE0),
+            outline = Color(0xFF9AA5B1)
+        )
+    }
+}
+
 /** A muscle's readiness, where 1 is fully recovered and 0 is just trained. */
 typealias Readiness = Map<MuscleGroup, Float>
 
@@ -171,11 +190,54 @@ private fun WorkedLegend(primary: MuscleGroup?, secondary: Set<MuscleGroup>) {
     }
 }
 
+/**
+ * The muscles a session has worked so far, on a light figure.
+ *
+ * Fills in as sets are completed, which is the point of having it on the
+ * workout screen: a lifter mid-session can see what they have covered and
+ * what they have not. A muscle an exercise trains hardest is filled solid;
+ * one it merely uses is filled lighter, and the difference is what stops a
+ * bench press from looking like a shoulder day.
+ */
+@Composable
+fun TrainedMuscles(
+    primary: Set<MuscleGroup>,
+    secondary: Set<MuscleGroup>,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    height: Dp = 240.dp
+) {
+    val worked = (primary + secondary).filter { muscle -> (FRONT + BACK).any { it.muscle == muscle } }
+    val description = if (worked.isEmpty()) {
+        "Muscles trained. Nothing yet; complete a set and it fills in."
+    } else {
+        "Muscles trained so far: " + worked.joinToString { it.label }
+    }
+    val faint = tint.copy(alpha = 0.55f)
+    fun shade(muscle: MuscleGroup): Color = when (muscle) {
+        in primary -> tint
+        in secondary -> faint
+        else -> FigurePalette.LIGHT.idle
+    }
+
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(height)
+            .semantics { contentDescription = description },
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Figure(FRONT, "Front", Modifier.weight(1f), FigurePalette.LIGHT, ::shade)
+        Figure(BACK, "Back", Modifier.weight(1f), FigurePalette.LIGHT, ::shade)
+    }
+}
+
 @Composable
 private fun Figure(
     regions: List<Region>,
     label: String,
     modifier: Modifier = Modifier,
+    palette: FigurePalette = FigurePalette.DARK,
     colourFor: (MuscleGroup) -> Color
 ) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -190,20 +252,22 @@ private fun Figure(
 
             // The body first, so the parts we do not track -- head, hands, feet
             // -- still read as a person rather than as floating muscle.
-            SILHOUETTE.forEach { shape -> drawPath(shape.toPath(::at, figure), BODY) }
+            SILHOUETTE.forEach { shape -> drawPath(shape.toPath(::at, figure), palette.body) }
 
             regions.forEach { region ->
                 val colour = colourFor(region.muscle)
                 region.shapes.forEach { shape ->
                     val path = shape.toPath(::at, figure)
                     drawPath(path, colour)
-                    striate(path, colour, region.fibre, figure.width)
+                    if (colour != palette.idle && colour != palette.body) {
+                        striate(path, colour, region.fibre, figure.width)
+                    }
                     // A hairline in the card's own colour, so two muscles in the
                     // same state stay two muscles instead of merging into one
                     // green mass -- which is most of the figure on a rest day.
                     drawPath(
                         path = path,
-                        color = Slate800,
+                        color = palette.outline,
                         style = Stroke(width = figure.width * OUTLINE_WIDTH)
                     )
                 }
@@ -225,7 +289,6 @@ private fun Figure(
  * and they never appear on a muscle the exercise does not work.
  */
 private fun DrawScope.striate(path: Path, colour: Color, fibre: Fibre, figureWidth: Float) {
-    if (colour == IDLE_MUSCLE || colour == BODY) return
 
     val bounds = path.getBounds()
     if (bounds.width <= 0f || bounds.height <= 0f) return

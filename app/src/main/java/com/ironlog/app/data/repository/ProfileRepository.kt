@@ -31,6 +31,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.ironlog.app.data.entity.MuscleTint
 
 /**
  * Marks an avatar value as one of the app's built-in figures rather than a
@@ -90,6 +91,8 @@ interface ProfileRepository {
     suspend fun setWelcomeSound(enabled: Boolean): Result<Unit>
     suspend fun setPlateSet(plateSet: PlateSet): Result<Unit>
     suspend fun setStepSource(source: StepSource): Result<Unit>
+    val muscleTint: Flow<MuscleTint>
+    suspend fun setMuscleTint(tint: MuscleTint): Result<Unit>
     suspend fun setBarWeight(barWeightKg: Double): Result<Unit>
 
     /** Requires the password again: deletion is irreversible and wipes every row the user owns. */
@@ -134,6 +137,16 @@ class ProfileRepositoryImpl @Inject constructor(
             // racks does not leave a 20 kg bar sitting under pound plates.
             barWeightKg = prefs[KEY_BAR_WEIGHT] ?: TrainingMath.defaultBarKg(set)
         )
+    }
+
+    override val muscleTint: Flow<MuscleTint> = dataStore.data.map { prefs ->
+        prefs[KEY_MUSCLE_TINT]
+            ?.let { runCatching { MuscleTint.valueOf(it) }.getOrNull() }
+            ?: MuscleTint.PLUM
+    }
+
+    override suspend fun setMuscleTint(tint: MuscleTint): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { dataStore.edit { prefs -> prefs[KEY_MUSCLE_TINT] = tint.name }; Unit }
     }
 
     override val stepSource: Flow<StepSource> = dataStore.data.map { prefs ->
@@ -293,6 +306,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_WELCOME_SOUND = booleanPreferencesKey("welcome_sound_enabled")
         val KEY_PLATE_SET = stringPreferencesKey("plate_set")
         val KEY_STEP_SOURCE = stringPreferencesKey("step_source")
+        val KEY_MUSCLE_TINT = stringPreferencesKey("muscle_tint")
         val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")
 
     }

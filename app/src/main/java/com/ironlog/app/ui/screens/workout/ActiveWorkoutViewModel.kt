@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
+import com.ironlog.app.data.entity.MuscleTint
 
 /** One exercise card: the live sets plus the last session's sets for the PREVIOUS column. */
 data class ExerciseBlock(
@@ -48,7 +49,8 @@ data class ActiveWorkoutUiState(
     val volumeKg: Double = 0.0,
     val completedSets: Int = 0,
     val isFinishing: Boolean = false,
-    val equipment: EquipmentSettings = EquipmentSettings()
+    val equipment: EquipmentSettings = EquipmentSettings(),
+    val muscleTint: MuscleTint = MuscleTint.PLUM
 )
 
 sealed interface ActiveWorkoutEvent {
@@ -59,7 +61,7 @@ sealed interface ActiveWorkoutEvent {
 @HiltViewModel
 class ActiveWorkoutViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
-    profileRepository: ProfileRepository,
+    private val profile: ProfileRepository,
     private val restTimer: RestTimerController,
     private val repCounter: RepCounter
 ) : ViewModel() {
@@ -78,6 +80,13 @@ class ActiveWorkoutViewModel @Inject constructor(
     val restRunning: StateFlow<Boolean> = restTimer.isRunning
 
     val repCounterAvailable: Boolean = repCounter.isAvailable()
+
+    /** The colour the figure fills worked muscles with. Saved, so it holds across sessions. */
+    fun setMuscleTint(tint: MuscleTint) {
+        viewModelScope.launch {
+            profile.setMuscleTint(tint).onFailure { _message.value = it.userMessage("Could not save the colour") }
+        }
+    }
 
     /** Previous-session sets per exercise id, fetched once per exercise. */
     private val previousCache = MutableStateFlow<Map<String, List<WorkoutSetEntity>>>(emptyMap())
@@ -98,20 +107,22 @@ class ActiveWorkoutViewModel @Inject constructor(
         val active: com.ironlog.app.data.dao.WorkoutWithDetail?,
         val user: com.ironlog.app.data.entity.UserEntity?,
         val previous: Map<String, List<WorkoutSetEntity>>,
-        val equipment: EquipmentSettings
+        val equipment: EquipmentSettings,
+        val tint: MuscleTint
     )
 
     init {
         viewModelScope.launch {
             combine(
                 workoutRepository.observeActive(),
-                profileRepository.observeUser(),
+                profile.observeUser(),
                 previousCache,
-                profileRepository.equipment
-            ) { active, user, previous, equipment ->
-                Loaded(active, user, previous, equipment)
+                profile.equipment,
+                profile.muscleTint
+            ) { active, user, previous, equipment, tint ->
+                Loaded(active, user, previous, equipment, tint)
             }
-                .collect { (active, user, previous, equipment) ->
+                .collect { (active, user, previous, equipment, tint) ->
                     if (active == null) {
                         // Null before the first load means there is no session; null
                         // later means it was discarded. Either way the screen closes,
@@ -148,7 +159,8 @@ class ActiveWorkoutViewModel @Inject constructor(
                             autoRestTimer = user?.autoRestTimerEnabled ?: true,
                             volumeKg = TrainingMath.totalVolume(allSets),
                             completedSets = allSets.count { set -> set.isCompleted },
-                            equipment = equipment
+                            equipment = equipment,
+                        muscleTint = tint
                         )
                     }
                 }

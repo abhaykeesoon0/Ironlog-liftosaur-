@@ -118,3 +118,20 @@ enum class PhotoPose(val label: String) {
     BACK("Back"),
     OTHER("Other")
 }
+
+/**
+ * The colour the figure uses for a muscle that has been worked.
+ *
+ * A preference rather than a fixed colour because the figure is the one place
+ * in the app a lifter looks at during a session, and what it is filled with is
+ * theirs to choose. Stored as the colour itself so the data layer does not
+ * need to know anything about Compose.
+ */
+enum class MuscleTint(val label: String, val argb: Long) {
+    PLUM("Plum", 0xFFA78BFA),
+    CHALK("Chalk", 0xFFF2F5F7),
+    EMBER("Ember", 0xFFE03131),
+    OCEAN("Ocean", 0xFF1C7ED6),
+    MOSS("Moss", 0xFF2F9E44),
+    GOLD("Gold", 0xFFFFC94D)
+}
