@@ -78,6 +78,13 @@ fun ExerciseDemo(
         }
     }
 
+    // The photographs are not all the same shape: some are landscape, some are
+    // portrait. Forced into one fixed frame the portrait ones shrink to a third
+    // of the width, which is enough to lose the detail that names the lift --
+    // on a Bulgarian split squat, the rear foot up on the bench.
+    val first = loaded.first()
+    val ratio = (first.width.toFloat() / first.height).coerceIn(0.68f, 1.6f)
+
     Column(modifier.fillMaxWidth()) {
         Crossfade(
             targetState = shown,
@@ -85,7 +92,7 @@ fun ExerciseDemo(
             label = "demo frame",
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f / 2f)
+                .aspectRatio(ratio)
                 .clip(RoundedCornerShape(Space.sm))
                 .background(Slate800)
                 .semantics {
