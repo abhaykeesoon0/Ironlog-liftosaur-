@@ -4,7 +4,9 @@ import android.app.Application
 import android.util.Log
 import com.ironlog.app.core.notifications.NotificationHelper
 import com.ironlog.app.data.dao.ExerciseDao
+import com.ironlog.app.data.dao.NutritionDao
 import com.ironlog.app.data.seed.ExerciseSeed
+import com.ironlog.app.data.seed.FoodSeed
 import com.ironlog.app.di.ApplicationScope
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -15,6 +17,7 @@ import javax.inject.Inject
 class IronLogApplication : Application() {
 
     @Inject lateinit var exerciseDao: ExerciseDao
+    @Inject lateinit var nutritionDao: NutritionDao
     @Inject lateinit var notificationHelper: NotificationHelper
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
 
@@ -39,6 +42,9 @@ class IronLogApplication : Application() {
             runCatching {
                 if (exerciseDao.countSeeded() < ExerciseSeed.all.size) {
                     exerciseDao.upsertAll(ExerciseSeed.all)
+                }
+                if (nutritionDao.countSeeded() < FoodSeed.all.size) {
+                    nutritionDao.upsertFoods(FoodSeed.all)
                 }
             }.onFailure {
                 // Not fatal: the check runs again on the next launch. Logged so a

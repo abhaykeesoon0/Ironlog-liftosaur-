@@ -95,7 +95,7 @@ class QuestsTest {
         // pins the list and the lookup together.
         val generous = Quests.Inputs(
             workoutsToday = 99, volumeTodayKg = 999_999.0, musclesToday = 99, warmupSetsToday = 99,
-            bodyweightLoggedToday = true, stepsToday = 99_999,
+            bodyweightLoggedToday = true, stepsToday = 99_999, mealsLoggedToday = 99, daysLoggedThisWeek = 99,
             workoutsThisWeek = 99, recordsThisWeek = 99, musclesThisWeek = 99,
             longestSessionSecondsThisWeek = 99_999, volumeThisWeekKg = 999_999.0,
             cardioSessionsThisWeek = 99, stepsThisWeek = 999_999, newExercisesThisWeek = 99,

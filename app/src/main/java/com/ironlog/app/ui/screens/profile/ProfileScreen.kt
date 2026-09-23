@@ -74,10 +74,12 @@ import com.ironlog.app.ui.theme.ChalkFaint
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Space
 import java.io.File
+import androidx.compose.material.icons.filled.Restaurant
 
 @Composable
 fun ProfileScreen(
     onOpenBody: () -> Unit,
+    onOpenNutrition: () -> Unit,
     onOpenPhotos: () -> Unit,
     onOpenCardio: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -192,6 +194,7 @@ fun ProfileScreen(
         Spacer(Modifier.height(Space.xl))
         SectionHeader("Track")
         NavRow(Icons.Default.MonitorWeight, "Body measurements", onOpenBody, "Weight, body fat and tape measurements")
+        NavRow(Icons.Default.Restaurant, "Nutrition", onOpenNutrition, "Log meals and build a plan for your goal")
         Hairline()
         NavRow(Icons.Default.PhotoLibrary, "Progress photos", onOpenPhotos, "Private to this phone")
         Hairline()

@@ -28,6 +28,7 @@ import com.ironlog.app.data.entity.SetType
 import com.ironlog.app.data.repository.BodyRepository
 import com.ironlog.app.data.repository.CardioRepository
 import com.ironlog.app.domain.usecase.TrainingMath
+import com.ironlog.app.data.repository.NutritionRepository
 
 data class QuestsUiState(
     val isLoading: Boolean = true,
@@ -44,7 +45,8 @@ class QuestsViewModel @Inject constructor(
     workoutRepository: WorkoutRepository,
     goalRepository: StrengthGoalRepository,
     cardioRepository: CardioRepository,
-    bodyRepository: BodyRepository
+    bodyRepository: BodyRepository,
+    nutritionRepository: NutritionRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(QuestsUiState())
@@ -62,14 +64,19 @@ class QuestsViewModel @Inject constructor(
             rewardsRepository.observeClaims(keys.values.toList()),
             rewardsRepository.observeBalance()
         ) { history, muscleRows, claims, balance -> Log(history, muscleRows, claims, balance) }
+        val weekStartMillis = run {
+            val today = LocalDate.now(zone)
+            today.minusDays((today.dayOfWeek.value - 1).toLong()).atStartOfDay(zone).toInstant().toEpochMilli()
+        }
         val activity = combine(
             cardioRepository.observeSessions(),
             cardioRepository.observeStepsSince(7),
-            bodyRepository.observeMeasurements()
-        ) { sessions, steps, measurements -> Activity(sessions, steps, measurements) }
+            bodyRepository.observeMeasurements(),
+            nutritionRepository.observeLogsSince(weekStartMillis)
+        ) { sessions, steps, measurements, meals -> Activity(sessions, steps, measurements, meals) }
 
         viewModelScope.launch {
-            combine(log, activity) { (history, muscleRows, claims, balance), (cardio, steps, measurements) ->
+            combine(log, activity) { (history, muscleRows, claims, balance), (cardio, steps, measurements, meals) ->
                 val today = LocalDate.now(zone)
                 val weekStart = today.minusDays((today.dayOfWeek.value - 1).toLong())
                 val monthStart = today.withDayOfMonth(1)
@@ -103,6 +110,8 @@ class QuestsViewModel @Inject constructor(
                     },
                     bodyweightLoggedToday = measurements.any { it.weightKg != null && dayOf(it.takenAt) == today },
                     stepsToday = stepsByDay[today.toEpochDay()] ?: 0,
+                    mealsLoggedToday = meals.filter { dayOf(it.log.loggedAt) == today }.map { it.log.meal }.distinct().size,
+                    daysLoggedThisWeek = meals.map { dayOf(it.log.loggedAt) }.distinct().size,
                     workoutsThisWeek = thisWeek.size,
                     recordsThisWeek = thisWeek.sumOf { it.prCount },
                     musclesThisWeek = muscleRows
@@ -173,7 +182,8 @@ class QuestsViewModel @Inject constructor(
     private data class Activity(
         val cardio: List<com.ironlog.app.data.entity.CardioSessionEntity>,
         val steps: List<com.ironlog.app.data.entity.DailyActivityEntity>,
-        val measurements: List<com.ironlog.app.data.entity.BodyMeasurementEntity>
+        val measurements: List<com.ironlog.app.data.entity.BodyMeasurementEntity>,
+        val meals: List<com.ironlog.app.data.dao.FoodLogWithFood>
     )
 
     private companion object {
