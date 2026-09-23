@@ -160,6 +160,16 @@ class WgerCatalogue @Inject constructor() {
         .replace(Regex("<[^>]*>"), " ")
         .replace("&nbsp;", " ")
         .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        // Numeric entities as well, which the website's editor writes for line
+        // breaks: without this, imported instructions read "swing&#10;&#10;From
+        // wger.de" on the screen.
+        .replace(Regex("&#(\\d{1,5});")) { match ->
+            match.groupValues[1].toIntOrNull()?.takeIf { it in 1..0x10FFFF }
+                ?.let { String(Character.toChars(it)) } ?: " "
+        }
         .replace(Regex("\\s+"), " ")
         .trim()
 

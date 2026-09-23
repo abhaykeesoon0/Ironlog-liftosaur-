@@ -57,9 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.height
-import com.ironlog.app.data.seed.MovementPatterns
-import com.ironlog.app.domain.usecase.MovementPattern
-import com.ironlog.app.ui.components.MovementAnimation
+import com.ironlog.app.ui.components.ExerciseDemo
 import com.ironlog.app.ui.components.MuscleHighlight
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Chalk
@@ -84,7 +82,7 @@ fun ExerciseLibraryScreen(
     val exercises by viewModel.exercises.collectAsStateWithLifecycle()
     val create by viewModel.create.collectAsStateWithLifecycle()
 
-    /** The exercise whose movement is being shown, if any. */
+    /** The exercise being demonstrated, if any. */
     var demo by remember { mutableStateOf<ExerciseEntity?>(null) }
 
     Column(Modifier.fillMaxSize().imePadding()) {
@@ -184,21 +182,13 @@ fun ExerciseLibraryScreen(
 }
 
 /**
- * The movement behind an exercise, as an animated figure.
+ * How an exercise is performed, and what it works.
  *
  * Shown from the library so a lifter can tell what "Jefferson Squat" is before
  * committing it to a workout, rather than after.
  */
 @Composable
 private fun MovementDemoDialog(exercise: ExerciseEntity, onDismiss: () -> Unit) {
-    val pattern = remember(exercise.id) {
-        // The shipped library's movements were decided offline against the
-        // source dataset, so they are looked up rather than guessed. Reading
-        // the name is the fallback, and only a movement nobody has classified
-        // -- one the user wrote, or imported -- ever reaches it.
-        MovementPatterns.byExerciseId[exercise.id]
-            ?: MovementPattern.of(exercise.name, exercise.primaryMuscle, exercise.category)
-    }
     val secondary = remember(exercise.id) {
         exercise.secondaryMuscles
             .split(",")
@@ -210,18 +200,12 @@ private fun MovementDemoDialog(exercise: ExerciseEntity, onDismiss: () -> Unit) 
         onDismissRequest = onDismiss,
         title = { Text(exercise.name, color = Chalk) },
         text = {
-            // Scrolls, because the movement, the anatomy and the instructions
-            // together are taller than a dialog on a small phone.
+            // Scrolls, because the anatomy and the instructions together are
+            // taller than a dialog on a small phone.
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                MovementAnimation(
-                    pattern = pattern,
-                    primaryMuscle = exercise.primaryMuscle,
-                    secondaryMuscles = secondary,
-                    // Named on the anatomy chart below instead, so the two
-                    // panels do not print the same list twice.
-                    showKey = false
-                )
-                Spacer(Modifier.height(Space.lg))
+                // How the lift is performed: the two ends of a repetition.
+                ExerciseDemo(exerciseId = exercise.id, exerciseName = exercise.name)
+                Spacer(Modifier.height(Space.md))
                 Hairline()
                 Spacer(Modifier.height(Space.md))
                 // What the lift is for, on a body rather than in a sentence.
@@ -277,8 +261,8 @@ private fun ExerciseRow(
             )
         }
         // Its own button rather than part of the row: in pick mode the row
-        // selects the exercise, and watching the movement must not also add it
-        // to the workout.
+        // selects the exercise, and watching the demonstration must not also
+        // add it to the workout.
         IconButton(onClick = onPlay) {
             Icon(
                 Icons.Default.PlayCircleOutline,
