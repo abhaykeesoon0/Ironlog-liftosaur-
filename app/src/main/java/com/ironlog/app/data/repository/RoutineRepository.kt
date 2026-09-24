@@ -21,7 +21,9 @@ data class RoutineExerciseDraft(
     val targetRepsLow: Int = 8,
     val targetRepsHigh: Int = 12,
     val restSeconds: Int = 120,
-    val notes: String = ""
+    val notes: String = "",
+    val targetWeightKg: Double? = null,
+    val progressionKg: Double = 0.0
 )
 
 data class RoutineDraft(
@@ -71,7 +73,9 @@ class RoutineRepositoryImpl @Inject constructor(
                             targetRepsLow = it.routineExercise.targetRepsLow,
                             targetRepsHigh = it.routineExercise.targetRepsHigh,
                             restSeconds = it.routineExercise.restSeconds,
-                            notes = it.routineExercise.notes
+                            notes = it.routineExercise.notes,
+                            targetWeightKg = it.routineExercise.targetWeightKg,
+                            progressionKg = it.routineExercise.progressionKg
                         )
                     }
             )
@@ -90,6 +94,8 @@ class RoutineRepositoryImpl @Inject constructor(
                     throw UserFacingException("${it.exerciseName}: check the rep range")
                 }
                 if (it.restSeconds !in 0..900) throw UserFacingException("${it.exerciseName}: rest must be 0-15 min")
+                it.targetWeightKg?.let { w -> if (w <= 0.0 || w > 1000.0) throw UserFacingException("${it.exerciseName}: check the target weight") }
+                if (it.progressionKg < 0.0 || it.progressionKg > 50.0) throw UserFacingException("${it.exerciseName}: check the progression step")
             }
 
             val now = System.currentTimeMillis()
@@ -117,7 +123,9 @@ class RoutineRepositoryImpl @Inject constructor(
                     targetRepsLow = item.targetRepsLow,
                     targetRepsHigh = item.targetRepsHigh,
                     restSeconds = item.restSeconds,
-                    notes = Validators.sanitiseText(item.notes, 200)
+                    notes = Validators.sanitiseText(item.notes, 200),
+                    targetWeightKg = item.targetWeightKg,
+                    progressionKg = item.progressionKg
                 )
             }
             routineDao.saveRoutine(routine, items)

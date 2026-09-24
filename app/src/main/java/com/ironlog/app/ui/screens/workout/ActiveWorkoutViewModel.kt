@@ -29,6 +29,11 @@ import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import com.ironlog.app.data.entity.MuscleTint
 import com.ironlog.app.ui.components.Undo
+import android.util.Log
+import com.ironlog.app.core.sensors.HealthConnectWriter
+import com.ironlog.app.core.sensors.VoiceSetInput
+import com.ironlog.app.domain.usecase.SetPhrase
+import com.ironlog.app.ui.format.formatWeight
 
 /** One exercise card: the live sets plus the last session's sets for the PREVIOUS column. */
 data class ExerciseBlock(
@@ -64,7 +69,9 @@ class ActiveWorkoutViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
     private val profile: ProfileRepository,
     private val restTimer: RestTimerController,
-    private val repCounter: RepCounter
+    private val repCounter: RepCounter,
+    private val voice: VoiceSetInput,
+    private val healthConnect: HealthConnectWriter
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ActiveWorkoutUiState())
@@ -81,6 +88,34 @@ class ActiveWorkoutViewModel @Inject constructor(
     val restRunning: StateFlow<Boolean> = restTimer.isRunning
 
     val repCounterAvailable: Boolean = repCounter.isAvailable()
+    val voiceAvailable: Boolean = voice.isAvailable()
+
+    /**
+     * Hears one set and writes it into the first open row of the exercise,
+     * adding a row if every one is ticked. What was heard is echoed back, so
+     * a misheard number is caught before it is ticked.
+     */
+    fun listenForSet(workoutExerciseId: String) {
+        viewModelScope.launch {
+            _message.value = "Listening\u2026 say the weight and the reps"
+            val heard = voice.listen().getOrElse { e -> _message.value = e.userMessage("Couldn't listen"); return@launch }
+            val parsed = SetPhrase.parse(heard, _state.value.unit)
+            if (parsed.isEmpty) { _message.value = "Heard \"$heard\", but not a weight or a rep count"; return@launch }
+            val block = _state.value.exercises.firstOrNull { it.id == workoutExerciseId } ?: return@launch
+            var target = block.sets.firstOrNull { !it.isCompleted }
+            if (target == null) {
+                writeLock.withLock { workoutRepository.addSet(workoutExerciseId) }
+                target = _state.value.exercises.firstOrNull { it.id == workoutExerciseId }?.sets?.lastOrNull()
+            }
+            val set = target ?: return@launch
+            parsed.weightKg?.let { setWeight(set.id, it) }
+            parsed.reps?.let { setReps(set.id, it) }
+            _message.value = "Heard: " + listOfNotNull(
+                parsed.weightKg?.let { _state.value.unit.formatWeight(it) },
+                parsed.reps?.let { "$it reps" }
+            ).joinToString(" \u00d7 ")
+        }
+    }
 
     /** The colour the figure fills worked muscles with. Saved, so it holds across sessions. */
     fun setMuscleTint(tint: MuscleTint) {
@@ -184,8 +219,9 @@ class ActiveWorkoutViewModel @Inject constructor(
         _event.value = null
     }
 
-    fun consumeMessage() {
-        _message.value = null
+    /** Clears [shown] only if it is still the current message, so a newer one is not lost. */
+    fun consumeMessage(shown: String) {
+        _message.compareAndSet(shown, null)
     }
 
     // ------------------------------------------------------------ workout level
@@ -210,6 +246,14 @@ class ActiveWorkoutViewModel @Inject constructor(
             writeLock.withLock { workoutRepository.finishActive() }
                 .onSuccess { summary ->
                     restTimer.skip()
+                    // Written back after the fact and off the critical path: the
+                    // summary screen does not wait on another app.
+                    val startedAt = _state.value.startedAt
+                    val name = _state.value.name
+                    viewModelScope.launch {
+                        val outcome = healthConnect.writeStrength(name, startedAt, System.currentTimeMillis())
+                        if (outcome is HealthConnectWriter.Outcome.Failed) Log.w("IronLog", "Health Connect: ${outcome.message}")
+                    }
                     _event.value = ActiveWorkoutEvent.Finished(summary.workoutId)
                 }
                 .onFailure { e ->

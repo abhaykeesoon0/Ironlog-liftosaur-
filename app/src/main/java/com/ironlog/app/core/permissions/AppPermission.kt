@@ -52,6 +52,12 @@ enum class AppPermission(
             "steps during a cardio session. It reads the sensor only — no movement history is stored off-device.",
         deniedConsequence = "Without activity access, daily steps and in-session step counts are unavailable."
     ),
+    MICROPHONE(
+        title = "Microphone",
+        rationale = "The microphone is used only while you hold the mic button on a set, to hear a weight " +
+            "and a rep count. The phone's own recogniser does the listening; IronLog keeps only the words.",
+        deniedConsequence = "Without microphone access you can still type every set; you just can't say it."
+    ),
     READ_IMAGES(
         title = "Photos",
         rationale = "Read access lets you choose an existing photo from your gallery as a progress shot or avatar, " +
@@ -66,6 +72,7 @@ enum class AppPermission(
     val manifestPermission: String?
         get() = when (this) {
             CAMERA -> Manifest.permission.CAMERA
+            MICROPHONE -> Manifest.permission.RECORD_AUDIO
             LOCATION -> Manifest.permission.ACCESS_FINE_LOCATION
             NOTIFICATIONS ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)

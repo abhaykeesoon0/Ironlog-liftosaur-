@@ -60,6 +60,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.ironlog.app.ui.screens.onboarding.OnboardingScreen
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * Single activity for the whole app.
@@ -149,11 +153,17 @@ private fun IronLogApp(
     onDeepLinkConsumed: () -> Unit
 ) {
     val session by viewModel.sessionState.collectAsStateWithLifecycle()
+    val needsOnboarding by viewModel.needsOnboarding.collectAsStateWithLifecycle()
 
     when (val state = session) {
         SessionState.Loading -> LaunchScreen(Modifier.fillMaxSize())
 
-        SessionState.SignedOut -> AuthNavHost(onAuthenticated = { viewModel.onAuthenticated() })
+        SessionState.SignedOut -> when (needsOnboarding) {
+            // The intro comes before the first sign-in, once per device.
+            null -> LaunchScreen(Modifier.fillMaxSize())
+            true -> OnboardingScreen(onDone = viewModel::finishOnboarding)
+            false -> AuthNavHost(onAuthenticated = { viewModel.onAuthenticated() })
+        }
 
         is SessionState.SignedIn -> {
             // The lock is drawn *over* the app rather than replacing it. Swapping
@@ -262,6 +272,15 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     val sessionState: StateFlow<SessionState> = authRepository.sessionState
+
+    /** Null until the preference has been read, so the intro is neither flashed nor skipped by accident. */
+    val needsOnboarding: StateFlow<Boolean?> = profileRepository.onboardingDone
+        .map { done -> !done }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun finishOnboarding() {
+        viewModelScope.launch { profileRepository.setOnboardingDone(true) }
+    }
 
     private var backgroundedAt: Long? = null
 

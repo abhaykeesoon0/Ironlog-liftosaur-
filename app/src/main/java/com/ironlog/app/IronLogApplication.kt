@@ -12,6 +12,7 @@ import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.ironlog.app.core.widget.WidgetSync
 
 @HiltAndroidApp
 class IronLogApplication : Application() {
@@ -20,6 +21,7 @@ class IronLogApplication : Application() {
     @Inject lateinit var nutritionDao: NutritionDao
     @Inject lateinit var notificationHelper: NotificationHelper
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
+    @Inject lateinit var widgetSync: WidgetSync
 
     override fun onCreate() {
         super.onCreate()
@@ -28,6 +30,9 @@ class IronLogApplication : Application() {
         // exist before any notification is posted, and doing it here means the
         // rest timer never races against channel creation.
         notificationHelper.hashCode()
+
+        // The widget follows the log for the life of the process.
+        widgetSync.start(applicationScope)
 
         seedExerciseLibrary()
     }

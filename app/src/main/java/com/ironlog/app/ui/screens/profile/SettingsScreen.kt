@@ -78,11 +78,13 @@ import com.ironlog.app.core.security.BackupCrypto
 import com.ironlog.app.data.repository.LOCK_GRACE_OPTIONS
 import com.ironlog.app.ui.components.ConfirmDialog
 import com.ironlog.app.ui.components.PassphraseDialog
+import androidx.compose.material.icons.filled.Info
 
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     onChangePassword: () -> Unit,
+    onOpenOnboarding: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val user by viewModel.user.collectAsStateWithLifecycle()
@@ -307,6 +309,20 @@ fun SettingsScreen(
                         "The colour the figure on the workout screen fills a worked muscle with.",
                         Modifier.padding(top = Space.xs)
                     )
+                }
+            }
+
+            // --------------------------------------------------------- home screen
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Home screen")
+            IronCard {
+                Column {
+                    Text("Widget", style = MaterialTheme.typography.bodyLarge, color = Chalk)
+                    Caption("This week's sessions, your streak and today's food, on the home screen.")
+                    Spacer(Modifier.height(Space.sm))
+                    SecondaryButton(text = "Add to home screen", onClick = { viewModel.addWidget(context) })
+                    Hairline(Modifier.padding(vertical = Space.sm))
+                    NavRow(Icons.Default.Info, "Replay the introduction", onOpenOnboarding, "The three screens from first launch")
                 }
             }
 

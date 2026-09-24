@@ -90,6 +90,9 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    // The home-screen widget.
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.work.runtime)

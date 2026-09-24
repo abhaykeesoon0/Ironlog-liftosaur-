@@ -25,6 +25,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.ironlog.app.data.repository.ScanResult
 import com.ironlog.app.ui.components.Undo
+import android.util.Log
+import com.ironlog.app.core.sensors.HealthConnectWriter
 
 data class NutritionUiState(
     val isLoading: Boolean = true,
@@ -47,7 +49,8 @@ data class NutritionUiState(
 @HiltViewModel
 class NutritionViewModel @Inject constructor(
     private val repository: NutritionRepository,
-    profileRepository: ProfileRepository
+    profileRepository: ProfileRepository,
+    private val healthConnect: HealthConnectWriter
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(NutritionUiState())
@@ -70,8 +73,16 @@ class NutritionViewModel @Inject constructor(
 
     fun logFood(food: FoodEntity, grams: Double, meal: Meal) {
         viewModelScope.launch {
-            repository.logFood(food.id, grams, meal, System.currentTimeMillis())
-                .onSuccess { _state.update { it.copy(message = "${food.name} added to ${meal.label.lowercase()}") } }
+            val at = System.currentTimeMillis()
+            repository.logFood(food.id, grams, meal, at)
+                .onSuccess {
+                    _state.update { it.copy(message = "${food.name} added to ${meal.label.lowercase()}") }
+                    val p = NutritionMath.portion(grams, food.kcalPer100g, food.proteinPer100g, food.carbsPer100g, food.fatPer100g)
+                    viewModelScope.launch {
+                        val outcome = healthConnect.writeNutrition(food.name, at, p.kcal, p.proteinG, p.carbsG, p.fatG, meal)
+                        if (outcome is HealthConnectWriter.Outcome.Failed) Log.w("IronLog", "Health Connect: ${outcome.message}")
+                    }
+                }
                 .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not log that food")) } }
         }
     }

@@ -173,6 +173,39 @@ fun WorkoutDetailScreen(
                         }
                     }
                 }
+                if (state.justFinished && state.nextTargets.isNotEmpty()) {
+                    item {
+                        IronCard {
+                            Column {
+                                Caption("NEXT TIME")
+                                Spacer(Modifier.height(Space.sm))
+                                state.nextTargets.forEachIndexed { index, t ->
+                                    if (index > 0) Spacer(Modifier.height(Space.sm))
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                t.exerciseName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = Chalk,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Caption(
+                                                when (t.direction) {
+                                                    NextTarget.Direction.UP -> "Up: every set reached the top of the range"
+                                                    NextTarget.Direction.BACK -> "Back: the bottom of the range wasn't reached"
+                                                    NextTarget.Direction.HOLD -> "Holding until every set reaches the top of the range"
+                                                }
+                                            )
+                                        }
+                                        Spacer(Modifier.width(Space.sm))
+                                        Text(state.unit.formatWeight(t.targetKg), style = NumericType.stat, color = Chalk)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 if (detail.workout.notes.isNotBlank()) {
                     item {
                         IronCard {

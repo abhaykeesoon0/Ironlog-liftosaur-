@@ -98,6 +98,9 @@ interface ProfileRepository {
     val muscleTint: Flow<MuscleTint>
     /** How long the app may be in the background before the lock asks again. */
     val lockGraceSeconds: Flow<Int>
+    /** Whether the introduction has been seen on this device. Device-level: there is no user yet. */
+    val onboardingDone: Flow<Boolean>
+    suspend fun setOnboardingDone(done: Boolean): Result<Unit>
     suspend fun setLockGrace(seconds: Int): Result<Unit>
     suspend fun setMuscleTint(tint: MuscleTint): Result<Unit>
     suspend fun setBarWeight(barWeightKg: Double): Result<Unit>
@@ -144,6 +147,12 @@ class ProfileRepositoryImpl @Inject constructor(
             // racks does not leave a 20 kg bar sitting under pound plates.
             barWeightKg = prefs[KEY_BAR_WEIGHT] ?: TrainingMath.defaultBarKg(set)
         )
+    }
+
+    override val onboardingDone: Flow<Boolean> = dataStore.data.map { prefs -> prefs[KEY_ONBOARDED] ?: false }
+
+    override suspend fun setOnboardingDone(done: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { dataStore.edit { prefs -> prefs[KEY_ONBOARDED] = done }; Unit }
     }
 
     override val lockGraceSeconds: Flow<Int> = dataStore.data.map { prefs -> prefs[KEY_LOCK_GRACE] ?: DEFAULT_LOCK_GRACE }
@@ -325,6 +334,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_STEP_SOURCE = stringPreferencesKey("step_source")
         val KEY_MUSCLE_TINT = stringPreferencesKey("muscle_tint")
         val KEY_LOCK_GRACE = intPreferencesKey("lock_grace_seconds")
+        val KEY_ONBOARDED = booleanPreferencesKey("onboarding_done")
         val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")
 
     }
