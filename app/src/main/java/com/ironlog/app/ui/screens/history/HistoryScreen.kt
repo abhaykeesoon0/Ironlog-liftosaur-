@@ -81,6 +81,8 @@ import com.ironlog.app.ui.components.PrBadge
 import com.ironlog.app.ui.format.formatWeight
 import com.ironlog.app.ui.theme.NumericType
 import com.ironlog.app.ui.theme.Slate800
+import androidx.compose.material.icons.automirrored.filled.List
+import com.ironlog.app.ui.components.SecondaryButton
 
 /** A finished workout together with what that session earned. */
 data class HistoryEntry(
@@ -179,6 +181,9 @@ fun HistoryScreen(
     /** The calendar day whose workouts are open in the sheet, if any. */
     var openDay by remember { mutableStateOf<OpenDay?>(null) }
 
+    /** The month whose full workout list is open in the sheet, if any. */
+    var openMonth by remember { mutableStateOf<MonthGroup?>(null) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = Space.lg, vertical = Space.sm),
@@ -223,13 +228,28 @@ fun HistoryScreen(
                             )
                         }
                     }
-                    items(month.entries, key = { it.detail.workout.id }) { entry ->
-                        WorkoutHistoryCard(entry, state.unit) { onOpenWorkout(entry.detail.workout.id) }
+                    // One card for the month rather than one per workout: the
+                    // calendar already shows which days were trained, so the list
+                    // is a tap away instead of a screen's worth of scrolling.
+                    item(key = "summary-${month.label}") {
+                        MonthSummaryCard(month, state.unit) { openMonth = month }
                     }
                 }
             }
         }
         item { Spacer(Modifier.height(Space.xl)) }
+    }
+
+    openMonth?.let { month ->
+        MonthSheet(
+            month = month,
+            unit = state.unit,
+            onOpenWorkout = { id ->
+                openMonth = null
+                onOpenWorkout(id)
+            },
+            onDismiss = { openMonth = null }
+        )
     }
 
     openDay?.let { day ->
@@ -247,6 +267,65 @@ fun HistoryScreen(
 
 /** A day pressed on the calendar: which month, and which date within it. */
 private data class OpenDay(val month: MonthGroup, val dayOfMonth: Int)
+
+/**
+ * The month in one card: what it added up to, and a button for the list.
+ *
+ * Volume, sets and records are summed from the same workouts the calendar
+ * above draws, so the card and the heatmap always agree.
+ */
+@Composable
+private fun MonthSummaryCard(month: MonthGroup, unit: UnitSystem, onSeeAll: () -> Unit) {
+    val workouts = month.entries.map { it.detail.workout }
+    val count = workouts.size
+    val prs = workouts.sumOf { it.prCount }
+    IronCard {
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                StatTile(count.toString(), if (count == 1) "Workout" else "Workouts")
+                StatTile(unit.formatVolume(workouts.sumOf { it.totalVolumeKg }), "Volume")
+                StatTile(workouts.sumOf { it.totalSets }.toString(), "Sets")
+                StatTile(prs.toString(), "PRs", accent = if (prs > 0) PrGold else Chalk)
+            }
+            Spacer(Modifier.height(Space.md))
+            SecondaryButton(
+                text = if (count == 1) "See the workout" else "See all $count workouts",
+                onClick = onSeeAll,
+                leadingIcon = Icons.AutoMirrored.Filled.List
+            )
+        }
+    }
+}
+
+/** Every workout of one month, newest first, opened from the month's card. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MonthSheet(
+    month: MonthGroup,
+    unit: UnitSystem,
+    onOpenWorkout: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Slate800) {
+        LazyColumn(
+            contentPadding = PaddingValues(start = Space.lg, end = Space.lg, bottom = Space.xl),
+            verticalArrangement = Arrangement.spacedBy(Space.md)
+        ) {
+            item {
+                Text(month.label.substringBefore(" ·"), style = MaterialTheme.typography.titleLarge, color = Chalk)
+                Text(
+                    if (month.entries.size == 1) "1 workout" else "${month.entries.size} workouts",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ChalkFaint
+                )
+            }
+            items(month.entries, key = { it.detail.workout.id }) { entry ->
+                WorkoutHistoryCard(entry, unit) { onOpenWorkout(entry.detail.workout.id) }
+            }
+        }
+    }
+}
 
 /**
  * Everything trained on one day, opened from the calendar.
