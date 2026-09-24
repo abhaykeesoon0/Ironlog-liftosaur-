@@ -1,6 +1,10 @@
-# IronLog — project instructions for Claude Code
+# Liftosaur — project instructions for Claude Code
 
-Android strength-training tracker. University coursework for a Mobile Application
+Android strength-training tracker. The app was called IronLog until late in
+development: the user-facing name is Liftosaur, but the package
+(`com.ironlog.app`), database, preference files, theme names, class names and
+the `IronLog` logcat tag keep the old name so existing installs and backups
+carry over. University coursework for a Mobile Application
 Development module. Marked on UI/UX (30%), Functionality (30%), Device
 Integration (20%), Security Implementation (20%).
 
@@ -19,7 +23,7 @@ Integration (20%), Security Implementation (20%).
 ./gradlew assembleDebug          # build
 ./gradlew installDebug           # install on connected device/emulator
 ./gradlew lint                   # static analysis
-adb logcat -s IronLog:V          # app logs
+adb logcat -s IronLog:V          # app logs (the tag kept the old name)
 ```
 
 Requires JDK 17 and Android SDK 35. minSdk is 26.
