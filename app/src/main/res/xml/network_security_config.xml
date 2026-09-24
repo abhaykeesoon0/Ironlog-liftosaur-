@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The app is offline by design. The five hosts below are its only network
+    exceptions, each keyless (or keyed by the user) and opt-in. Everything is
+    HTTPS only, and each host is pinned to the root of its certificate chain
+    with a backup, so a forged certificate from a compromised authority is
+    refused. The pins expire after a year: past that date the platform falls
+    back to ordinary certificate validation rather than locking the user out
+    of a lookup because a root rotated.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Wikipedia and wger: Let's Encrypt, chained to ISRG Root X2 (backup X1). -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">wikipedia.org</domain>
+        <domain includeSubdomains="true">wger.de</domain>
+        <pin-set expiration="2027-09-24">
+            <pin digest="SHA-256">diGVwiVYbubAI3RW4hB9xU8e/CH2GnkuvVFZE8zmgzI=</pin>
+            <pin digest="SHA-256">C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</pin>
+            <pin digest="SHA-256">sCkq5UWXjg+7mKu9lMhhYF5bGLsy7VI/UNW3tccdR7w=</pin>
+        </pin-set>
+    </domain-config>
+
+    <!-- Open Food Facts: Let's Encrypt, chained to ISRG Root YR (backups X1, X2). -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">openfoodfacts.org</domain>
+        <pin-set expiration="2027-09-24">
+            <pin digest="SHA-256">fk6IOKit1ild5647BH06ujSIq5XbCgqlbYl6ANhhi88=</pin>
+            <pin digest="SHA-256">C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</pin>
+            <pin digest="SHA-256">diGVwiVYbubAI3RW4hB9xU8e/CH2GnkuvVFZE8zmgzI=</pin>
+        </pin-set>
+    </domain-config>
+
+    <!-- DuckDuckGo: DigiCert Global Root G2 (backup G3). -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">duckduckgo.com</domain>
+        <pin-set expiration="2027-09-24">
+            <pin digest="SHA-256">i7WTqTvh0OioIruIfFR4kMPnBqrS2rdiVPl/s2uC/CY=</pin>
+            <pin digest="SHA-256">uUwZgwDOxcBXrQcntwu+kYFpkiVkOaezL0WYEZ3anJc=</pin>
+        </pin-set>
+    </domain-config>
+
+    <!-- Anthropic (the user's own key): Google Trust Services Root R4 (backup R1). -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">anthropic.com</domain>
+        <pin-set expiration="2027-09-24">
+            <pin digest="SHA-256">mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</pin>
+            <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>

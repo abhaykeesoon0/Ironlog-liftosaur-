@@ -86,6 +86,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onChangePassword: () -> Unit,
     onOpenOnboarding: () -> Unit,
+    onOpenPrivacy: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val user by viewModel.user.collectAsStateWithLifecycle()
@@ -349,6 +350,8 @@ fun SettingsScreen(
                     SecondaryButton(text = "Add to home screen", onClick = { viewModel.addWidget(context) })
                     Hairline(Modifier.padding(vertical = Space.sm))
                     NavRow(Icons.Default.Info, "Replay the introduction", onOpenOnboarding, "The three screens from first launch")
+                    Hairline(Modifier.padding(vertical = Space.sm))
+                    NavRow(Icons.Default.Lock, "Privacy & your data", onOpenPrivacy, "What is stored, how it is protected, what ever leaves the phone")
                 }
             }
 

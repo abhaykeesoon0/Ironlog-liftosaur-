@@ -64,6 +64,7 @@ import com.ironlog.app.ui.screens.nutrition.NutritionScreen
 import com.ironlog.app.ui.screens.nutrition.PlanScreen
 import com.ironlog.app.ui.screens.onboarding.OnboardingScreen
 import com.ironlog.app.ui.screens.home.CustomiseHomeScreen
+import com.ironlog.app.ui.screens.profile.PrivacyScreen
 
 object Routes {
     const val SIGN_IN = "auth/sign-in"
@@ -95,6 +96,7 @@ object Routes {
     const val NUTRITION = "nutrition"
     const val ONBOARDING = "onboarding"
     const val CUSTOMISE_HOME = "home/customise"
+    const val PRIVACY = "privacy"
     const val NUTRITION_PLAN = "nutrition/plan"
     const val CHANGE_PASSWORD = "settings/password"
 
@@ -365,7 +367,8 @@ fun MainNavHost(
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onChangePassword = { navController.navigate(Routes.CHANGE_PASSWORD) },
-                    onOpenOnboarding = { navController.navigate(Routes.ONBOARDING) }
+                    onOpenOnboarding = { navController.navigate(Routes.ONBOARDING) },
+                    onOpenPrivacy = { navController.navigate(Routes.PRIVACY) }
                 )
             }
             composable(Routes.ONBOARDING) {
@@ -373,6 +376,9 @@ fun MainNavHost(
             }
             composable(Routes.CUSTOMISE_HOME) {
                 CustomiseHomeScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.PRIVACY) {
+                PrivacyScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.CHANGE_PASSWORD) {
                 ChangePasswordScreen(onBack = { navController.popBackStack() })
