@@ -69,6 +69,10 @@ import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Slate900
 import com.ironlog.app.ui.theme.Space
 import java.io.File
+import android.app.Activity
+import android.view.WindowManager
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun PhotosScreen(
@@ -77,6 +81,15 @@ fun PhotosScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val unit by viewModel.unit.collectAsStateWithLifecycle()
+
+    // No screenshots and no thumbnail in the recents switcher while body
+    // photos are on screen. The flag is set for this screen only and
+    // cleared on the way out, so the rest of the app can still be captured.
+    val window = (LocalContext.current as? Activity)?.window
+    DisposableEffect(window) {
+        window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
 
     val camera = rememberPermissionState(AppPermission.CAMERA)
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->

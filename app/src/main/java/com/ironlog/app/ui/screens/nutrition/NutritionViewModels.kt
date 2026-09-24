@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.ironlog.app.data.repository.ScanResult
+import com.ironlog.app.ui.components.Undo
 
 data class NutritionUiState(
     val isLoading: Boolean = true,
@@ -75,9 +76,20 @@ class NutritionViewModel @Inject constructor(
         }
     }
 
+    /** The last entry removed, offered back for a few seconds. */
+    private val _undo = MutableStateFlow<Undo?>(null)
+    val undo: StateFlow<Undo?> = _undo.asStateFlow()
+    fun consumeUndo() { _undo.value = null }
+
     fun deleteLog(entry: FoodLogWithFood) {
         viewModelScope.launch {
             repository.deleteLog(entry.log.id)
+                .onSuccess {
+                    _undo.value = Undo("${entry.food.name} removed") {
+                        repository.restoreLog(entry.log)
+                            .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not restore that")) } }
+                    }
+                }
                 .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not remove that")) } }
         }
     }

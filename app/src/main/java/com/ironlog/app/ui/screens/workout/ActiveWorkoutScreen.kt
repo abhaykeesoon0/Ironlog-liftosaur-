@@ -94,6 +94,9 @@ import com.ironlog.app.data.entity.MuscleTint
 import com.ironlog.app.data.entity.SetType
 import com.ironlog.app.ui.components.TrainedMuscles
 import com.ironlog.app.ui.theme.Slate600
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.ironlog.app.ui.components.UndoSnackbar
 
 @Composable
 fun ActiveWorkoutScreen(
@@ -111,6 +114,9 @@ fun ActiveWorkoutScreen(
     val restRunning by viewModel.restRunning.collectAsStateWithLifecycle()
     val restRemaining by viewModel.restRemaining.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val haptic = LocalHapticFeedback.current
+    val undo by viewModel.undo.collectAsStateWithLifecycle()
+    UndoSnackbar(snackbar, undo) { viewModel.consumeUndo() }
     val notifications = rememberPermissionState(AppPermission.NOTIFICATIONS)
     var notificationCardDismissed by rememberSaveable { mutableStateOf(false) }
 
@@ -477,6 +483,7 @@ private fun ExerciseCard(
 ) {
     val exercise = block.item.exercise
     val category = exercise.category
+    val haptic = LocalHapticFeedback.current
     var menuOpen by remember { mutableStateOf(false) }
 
     IronCard {
@@ -548,7 +555,11 @@ private fun ExerciseCard(
                             onReps = { viewModel.setReps(set.id, it) },
                             onDuration = { viewModel.setDuration(set.id, it) },
                             onDistance = { viewModel.setDistance(set.id, it) },
-                            onToggle = { w, r -> viewModel.toggleComplete(set.id, w, r) },
+                            onToggle = { w, r ->
+                                // A tick you can feel, for hands that are busy with a bar.
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.toggleComplete(set.id, w, r)
+                            },
                             onDelete = { viewModel.deleteSet(set.id) },
                             onCountReps = if (repCounterAvailable) ({ onCountReps(set) }) else null
                         )

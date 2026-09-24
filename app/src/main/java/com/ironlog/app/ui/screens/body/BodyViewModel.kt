@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.ironlog.app.ui.components.Undo
 
 /** Which measurement a form field holds; drives parsing and labels. */
 enum class MeasureField(val label: String, val kind: Kind) {
@@ -123,11 +124,21 @@ class BodyViewModel @Inject constructor(
         }
     }
 
+    /** The last measurement removed, offered back for a few seconds. */
+    private val _undo = MutableStateFlow<Undo?>(null)
+    val undo: StateFlow<Undo?> = _undo.asStateFlow()
+    fun consumeUndo() { _undo.value = null }
+
     fun delete(item: BodyMeasurementEntity) {
         viewModelScope.launch {
-            bodyRepository.deleteMeasurement(item).onFailure { e ->
-                _error.value = e.userMessage("Could not delete the measurement")
-            }
+            bodyRepository.deleteMeasurement(item)
+                .onSuccess {
+                    _undo.value = Undo("Measurement removed") {
+                        bodyRepository.restoreMeasurement(item)
+                            .onFailure { e -> _error.value = e.userMessage("Could not restore that") }
+                    }
+                }
+                .onFailure { e -> _error.value = e.userMessage("Could not delete that") }
         }
     }
 

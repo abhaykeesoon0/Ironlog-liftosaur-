@@ -62,6 +62,8 @@ interface NutritionRepository {
 
     suspend fun logFood(foodId: String, grams: Double, meal: Meal, at: Long, note: String = ""): Result<Unit>
     suspend fun deleteLog(id: String): Result<Unit>
+    /** Puts a removed entry back, for the undo bar. */
+    suspend fun restoreLog(entry: FoodLogEntity): Result<Unit>
     suspend fun createFood(input: FoodInput): Result<FoodEntity>
     suspend fun saveGoal(input: GoalInput): Result<NutritionGoalEntity>
 
@@ -122,6 +124,13 @@ class NutritionRepositoryImpl @Inject constructor(
                 )
             }
         }
+
+    override suspend fun restoreLog(entry: FoodLogEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (entry.userId != currentUser.require()) throw UserFacingException("Entry not found")
+            nutritionDao.upsertLog(entry)
+        }
+    }
 
     override suspend fun deleteLog(id: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { nutritionDao.deleteLog(currentUser.require(), id) }

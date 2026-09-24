@@ -28,12 +28,21 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.ironlog.app.data.entity.MuscleTint
+import android.net.Uri
+import com.ironlog.app.data.repository.BackupRepository
+import com.ironlog.app.data.repository.DEFAULT_LOCK_GRACE
+import com.ironlog.app.core.security.wipe
 
 data class SettingsUiState(
     val exporting: ExportKind? = null,
     /** One-shot: the share sheet to open. Cleared by [SettingsViewModel.onShareLaunched]. */
     val shareIntent: Intent? = null,
     val isDeleting: Boolean = false,
+    val isBackingUp: Boolean = false,
+    val isRestoring: Boolean = false,
+    /** A backup file picked for restore, waiting on a passphrase or confirmation. */
+    val restoreUri: Uri? = null,
+    val restoreNeedsPassphrase: Boolean = false,
     val deleteError: String? = null,
     val error: String? = null,
     val message: String? = null
@@ -44,6 +53,7 @@ class SettingsViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val cloudAssistant: CloudAssistant,
     private val exportRepository: ExportRepository,
+    private val backupRepository: BackupRepository,
     private val biometricGate: BiometricGate
 ) : ViewModel() {
 
@@ -64,6 +74,9 @@ class SettingsViewModel @Inject constructor(
 
     val muscleTint: StateFlow<MuscleTint> = profileRepository.muscleTint
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MuscleTint.PLUM)
+
+    val lockGrace: StateFlow<Int> = profileRepository.lockGraceSeconds
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DEFAULT_LOCK_GRACE)
 
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
@@ -101,6 +114,9 @@ class SettingsViewModel @Inject constructor(
 
     fun setStepSource(source: StepSource) =
         persist("Could not change the step source") { profileRepository.setStepSource(source) }
+
+    fun setLockGrace(seconds: Int) =
+        persist("Could not change the lock timing") { profileRepository.setLockGrace(seconds) }
 
     fun setMuscleTint(tint: MuscleTint) =
         persist("Could not change the colour") { profileRepository.setMuscleTint(tint) }
@@ -170,6 +186,53 @@ class SettingsViewModel @Inject constructor(
                 .onFailure { e ->
                     _state.update { it.copy(exporting = null, error = e.userMessage("Export failed. Try again.")) }
                 }
+        }
+    }
+
+    /** Seals the full backup under [passphrase] and hands it to the share sheet. */
+    fun backupEncrypted(passphrase: CharArray) {
+        if (_state.value.isBackingUp) { passphrase.wipe(); return }
+        _state.update { it.copy(isBackingUp = true, error = null) }
+        viewModelScope.launch {
+            backupRepository.exportEncrypted(passphrase)
+                .onSuccess { file ->
+                    _state.update {
+                        it.copy(isBackingUp = false, shareIntent = exportRepository.shareIntent(file, ExportKind.FULL_JSON))
+                    }
+                }
+                .onFailure { e -> _state.update { it.copy(isBackingUp = false, error = e.userMessage("Backup failed. Try again.")) } }
+        }
+    }
+
+    /** A file was chosen: find out whether it needs a passphrase before asking for one. */
+    fun onRestoreFileChosen(uri: Uri) {
+        viewModelScope.launch {
+            backupRepository.isEncrypted(uri)
+                .onSuccess { sealed -> _state.update { it.copy(restoreUri = uri, restoreNeedsPassphrase = sealed) } }
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not open that file")) } }
+        }
+    }
+
+    fun cancelRestore() = _state.update { it.copy(restoreUri = null, restoreNeedsPassphrase = false) }
+
+    fun restore(passphrase: CharArray?) {
+        val uri = _state.value.restoreUri ?: run { passphrase?.wipe(); return }
+        _state.update { it.copy(isRestoring = true, error = null) }
+        viewModelScope.launch {
+            backupRepository.restore(uri, passphrase)
+                .onSuccess { summary ->
+                    _state.update {
+                        it.copy(
+                            isRestoring = false, restoreUri = null, restoreNeedsPassphrase = false,
+                            message = if (summary.isEmpty) "Nothing new in that backup" +
+                                (if (summary.skipped > 0) ": ${summary.skipped} entries were already here." else ".")
+                            else "Restored ${summary.workouts} workouts, ${summary.routines} routines, " +
+                                "${summary.measurements} measurements and ${summary.cardio} cardio sessions" +
+                                (if (summary.skipped > 0) "; ${summary.skipped} already here." else ".")
+                        )
+                    }
+                }
+                .onFailure { e -> _state.update { it.copy(isRestoring = false, error = e.userMessage("Restore failed")) } }
         }
     }
 

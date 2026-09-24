@@ -169,6 +169,15 @@ class DataExporter @Inject constructor(
         }
     }
 
+    /** Writes an already-sealed backup. The extension names the format, not the content. */
+    suspend fun exportBinary(bytes: ByteArray, extension: String): Result<File> = withContext(Dispatchers.IO) {
+        runCatching {
+            val file = File(exportsDir, "ironlog_backup_${stamp()}.$extension")
+            file.writeBytes(bytes)
+            file
+        }
+    }
+
     /** Hands the file to the system share sheet with a temporary read grant. */
     fun share(file: File, mimeType: String = "text/csv"): Intent {
         val uri: Uri = FileProvider.getUriForFile(

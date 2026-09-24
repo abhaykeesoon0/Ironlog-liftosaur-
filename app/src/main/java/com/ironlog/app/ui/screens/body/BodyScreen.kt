@@ -61,6 +61,10 @@ import com.ironlog.app.ui.theme.Plate15
 import com.ironlog.app.ui.theme.Plate20
 import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.theme.Space
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import com.ironlog.app.ui.components.UndoSnackbar
 
 @Composable
 fun BodyScreen(
@@ -73,6 +77,11 @@ fun BodyScreen(
     var pendingDelete by remember { mutableStateOf<BodyMeasurementEntity?>(null) }
     val unit = data.unit
 
+    val undo by viewModel.undo.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    UndoSnackbar(snackbar, undo) { viewModel.consumeUndo() }
+
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         IronTopBar(title = "Body measurements", onBack = onBack) {
             IconButton(onClick = viewModel::openForm) {
@@ -164,6 +173,8 @@ fun BodyScreen(
             },
             onDismiss = { pendingDelete = null }
         )
+    }
+    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(Space.lg))
     }
 }
 
