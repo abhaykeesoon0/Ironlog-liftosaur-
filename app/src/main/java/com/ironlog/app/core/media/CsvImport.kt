@@ -213,7 +213,7 @@ object CsvImport {
         val field = StringBuilder()
         var inQuotes = false
         var i = 0
-        val s = text.removePrefix("﻿")
+        val s = text.removePrefix("")
         while (i < s.length) {
             val c = s[i]
             when {
