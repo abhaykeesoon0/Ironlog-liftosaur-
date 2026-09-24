@@ -70,7 +70,7 @@ fun LaunchScreen(modifier: Modifier = Modifier) {
         modifier
             .fillMaxSize()
             .background(Slate900)
-            .semantics { contentDescription = "IronLog is starting" },
+            .semantics { contentDescription = "Liftosaur is starting" },
         contentAlignment = Alignment.Center
     ) {
         // The light, filling the whole screen: a wash from the top left and a
@@ -103,7 +103,7 @@ fun LaunchScreen(modifier: Modifier = Modifier) {
             Barbell(Modifier.size(width = 148.dp, height = 84.dp))
             Spacer(Modifier.height(Space.lg))
             Text(
-                text = "IRONLOG",
+                text = "LIFTOSAUR",
                 color = Chalk,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.SemiBold,

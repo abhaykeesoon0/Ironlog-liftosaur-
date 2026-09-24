@@ -48,7 +48,7 @@ class DataExporter @Inject constructor(
     suspend fun exportWorkoutsCsv(workouts: List<WorkoutWithDetail>): Result<File> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val file = File(exportsDir, "ironlog_workouts_${stamp()}.csv")
+                val file = File(exportsDir, "liftosaur_workouts_${stamp()}.csv")
                 file.bufferedWriter().use { writer ->
                     writer.appendLine(
                         listOf(
@@ -95,7 +95,7 @@ class DataExporter @Inject constructor(
     suspend fun exportMeasurementsCsv(items: List<BodyMeasurementEntity>): Result<File> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val file = File(exportsDir, "ironlog_measurements_${stamp()}.csv")
+                val file = File(exportsDir, "liftosaur_measurements_${stamp()}.csv")
                 file.bufferedWriter().use { writer ->
                     writer.appendLine(
                         listOf(
@@ -130,7 +130,7 @@ class DataExporter @Inject constructor(
     suspend fun exportCardioCsv(sessions: List<CardioSessionEntity>): Result<File> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val file = File(exportsDir, "ironlog_cardio_${stamp()}.csv")
+                val file = File(exportsDir, "liftosaur_cardio_${stamp()}.csv")
                 file.bufferedWriter().use { writer ->
                     writer.appendLine(
                         listOf(
@@ -163,7 +163,7 @@ class DataExporter @Inject constructor(
     /** Writes a pre-serialised JSON payload produced by the repository layer. */
     suspend fun exportJson(payload: String): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
-            val file = File(exportsDir, "ironlog_backup_${stamp()}.json")
+            val file = File(exportsDir, "liftosaur_backup_${stamp()}.json")
             file.writeText(payload)
             file
         }
@@ -172,7 +172,7 @@ class DataExporter @Inject constructor(
     /** Writes an already-sealed backup. The extension names the format, not the content. */
     suspend fun exportBinary(bytes: ByteArray, extension: String): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
-            val file = File(exportsDir, "ironlog_backup_${stamp()}.$extension")
+            val file = File(exportsDir, "liftosaur_backup_${stamp()}.$extension")
             file.writeBytes(bytes)
             file
         }

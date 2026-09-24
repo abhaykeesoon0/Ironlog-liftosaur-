@@ -106,7 +106,7 @@ fun CardioTrackScreen(
             } else {
                 runCatching { CardioTrackingService.start(context) }
                     .onSuccess { viewModel.onTrackingStarted() }
-                    .onFailure { viewModel.showError("Tracking couldn't start. Keep IronLog open on screen and try again.") }
+                    .onFailure { viewModel.showError("Tracking couldn't start. Keep Liftosaur open on screen and try again.") }
             }
         }
     }

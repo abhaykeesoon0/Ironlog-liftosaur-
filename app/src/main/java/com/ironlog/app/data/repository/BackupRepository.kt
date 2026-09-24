@@ -93,7 +93,7 @@ class BackupRepositoryImpl @Inject constructor(
                 val plain = exportRepository.export(ExportKind.FULL_JSON).getOrThrow()
                 val sealed = crypto.encrypt(plain.readBytes(), passphrase)
                 plain.delete()
-                exporter.exportBinary(sealed, "ironlog").getOrThrow()
+                exporter.exportBinary(sealed, "liftosaur").getOrThrow()
             }
         } finally {
             passphrase.wipe()
@@ -121,8 +121,8 @@ class BackupRepositoryImpl @Inject constructor(
                         bytes
                     }
                     val backup = runCatching { json.decodeFromString(Backup.serializer(), plain.decodeToString()) }
-                        .getOrElse { throw UserFacingException("That file is not an IronLog backup") }
-                    if (backup.format != "ironlog-backup") throw UserFacingException("That file is not an IronLog backup")
+                        .getOrElse { throw UserFacingException("That file is not a Liftosaur backup") }
+                    if (backup.format != "ironlog-backup") throw UserFacingException("That file is not a Liftosaur backup")
 
                     db.withTransaction { restoreInto(userId, backup) }
                 }

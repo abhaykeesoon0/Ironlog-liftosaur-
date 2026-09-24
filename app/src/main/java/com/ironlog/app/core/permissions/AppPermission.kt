@@ -29,7 +29,7 @@ enum class AppPermission(
 ) {
     CAMERA(
         title = "Camera",
-        rationale = "IronLog opens the camera to take progress photos and a profile picture, and to " +
+        rationale = "Liftosaur opens the camera to take progress photos and a profile picture, and to " +
             "scan food barcodes. Photos stay in the app's private storage on this phone; scanned " +
             "frames are read on the phone and never stored or sent.",
         deniedConsequence = "Without camera access you can still pick existing images and type a barcode by hand, but you can't shoot a photo or scan a label in the app."
@@ -55,7 +55,7 @@ enum class AppPermission(
     MICROPHONE(
         title = "Microphone",
         rationale = "The microphone is used only while you hold the mic button on a set, to hear a weight " +
-            "and a rep count. The phone's own recogniser does the listening; IronLog keeps only the words.",
+            "and a rep count. The phone's own recogniser does the listening; Liftosaur keeps only the words.",
         deniedConsequence = "Without microphone access you can still type every set; you just can't say it."
     ),
     READ_IMAGES(

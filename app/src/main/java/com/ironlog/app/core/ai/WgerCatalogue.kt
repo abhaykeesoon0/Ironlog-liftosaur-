@@ -178,7 +178,7 @@ class WgerCatalogue @Inject constructor() {
         const val PAGE_SIZE = 20
         const val ENGLISH = 2
         const val TIMEOUT_MS = 20_000
-        const val USER_AGENT = "IronLog/1.0 (coursework project; offline strength tracker)"
+        const val USER_AGENT = "Liftosaur/1.0 (coursework project; offline strength tracker)"
 
         val ANATOMY = mapOf(
             "Biceps brachii" to MuscleGroup.BICEPS,

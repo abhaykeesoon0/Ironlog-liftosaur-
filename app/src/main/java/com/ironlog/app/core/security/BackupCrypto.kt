@@ -29,7 +29,7 @@ import javax.inject.Singleton
 class BackupCrypto @Inject constructor() {
 
     class WrongPassphraseException : Exception("The passphrase is wrong, or the file has been altered")
-    class NotABackupException : Exception("That is not an IronLog backup")
+    class NotABackupException : Exception("That is not a Liftosaur backup")
 
     fun encrypt(plain: ByteArray, passphrase: CharArray): ByteArray {
         require(passphrase.size >= MIN_PASSPHRASE) { "Passphrase too short" }

@@ -82,7 +82,7 @@ class OpenFoodFacts @Inject constructor() {
         private const val BASE = "https://world.openfoodfacts.org/api/v2/product"
         private const val FIELDS = "product_name,brands,nutriments,serving_quantity,code"
         private const val TIMEOUT_MS = 15_000
-        private const val USER_AGENT = "IronLog/1.0 (coursework project; offline strength tracker)"
+        private const val USER_AGENT = "Liftosaur/1.0 (coursework project; offline strength tracker)"
 
         /**
          * Reads a product out of the API's JSON, or nothing if the entry has

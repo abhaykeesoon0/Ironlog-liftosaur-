@@ -78,7 +78,7 @@ class IronLogWidget : GlanceAppWidget() {
                     .clickable(actionStartActivity<MainActivity>()),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("IRONLOG", style = TextStyle(color = ColorProvider(FAINT), fontSize = 11.sp, fontWeight = FontWeight.Bold))
+                Text("LIFTOSAUR", style = TextStyle(color = ColorProvider(FAINT), fontSize = 11.sp, fontWeight = FontWeight.Bold))
                 Spacer(GlanceModifier.height(6.dp))
                 Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Stat(if (goal > 0) "$workouts/$goal" else "$workouts", "this week")

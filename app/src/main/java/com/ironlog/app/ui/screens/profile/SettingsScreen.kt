@@ -429,7 +429,7 @@ fun SettingsScreen(
                     SwitchRow(
                         title = "App lock",
                         caption = if (available || lockOn) {
-                            "Fingerprint, face or screen lock when you open IronLog"
+                            "Fingerprint, face or screen lock when you open Liftosaur"
                         } else {
                             availabilityMessage(availability)
                         },
@@ -461,7 +461,7 @@ fun SettingsScreen(
                                 )
                             }
                         }
-                        Caption("How long IronLog can be in the background before the lock asks again.", Modifier.padding(top = Space.xs))
+                        Caption("How long Liftosaur can be in the background before the lock asks again.", Modifier.padding(top = Space.xs))
                     }
                     Hairline(Modifier.padding(vertical = Space.sm))
                     NavRow(Icons.Default.Key, "Change password", onChangePassword)
@@ -502,7 +502,7 @@ fun SettingsScreen(
                     // The two that carry the whole log across phones. The sealed
                     // backup is the one to keep; the plain JSON above is for reading.
                     ExportRow(
-                        label = "Encrypted backup (.ironlog)",
+                        label = "Encrypted backup (.liftosaur)",
                         busy = state.isBackingUp,
                         enabled = !state.isBackingUp && !state.isRestoring,
                         onClick = { askBackupPassphrase = true }
@@ -515,7 +515,7 @@ fun SettingsScreen(
                     )
                     Caption(
                         "A backup is sealed with a passphrase of your choosing and can be restored on any phone with " +
-                            "IronLog. Restoring adds what is missing and leaves what is already here.",
+                            "Liftosaur. Restoring adds what is missing and leaves what is already here.",
                         Modifier.padding(top = Space.xs)
                     )
                 }
