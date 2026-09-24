@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import com.ironlog.app.domain.usecase.Predictor
 
 enum class ExerciseMetric(val label: String) {
     BEST_WEIGHT("Top weight"),
@@ -49,6 +50,10 @@ data class ExerciseDetailUiState(
     /** Oldest first, for charting. */
     val sessions: List<ExerciseSession> = emptyList(),
     val metric: ExerciseMetric = ExerciseMetric.BEST_WEIGHT,
+    /** The next session as the phone predicts it from the sessions above. */
+    val forecast: Predictor.Forecast? = null,
+    /** Where the estimated 1RM is headed in a month, along the recent trend. */
+    val projected1RmKg: Double? = null,
     val error: String? = null
 )
 
@@ -73,9 +78,9 @@ class ExerciseDetailViewModel @Inject constructor(
         exerciseRepository.observeExercise(exerciseId),
         exerciseRepository.observeRecords(exerciseId),
         workoutRepository.observeHistory(HISTORY_LIMIT),
-        profileRepository.observeUser(),
+        combine(profileRepository.observeUser(), profileRepository.trainingFocus) { u, f -> u to f },
         metric
-    ) { exercise, records, history, user, selected ->
+    ) { exercise, records, history, (user, focus), selected ->
         val sessions = history.mapNotNull { detail ->
             val sets = detail.exercises
                 .filter { it.exercise.id == exerciseId }
@@ -99,13 +104,19 @@ class ExerciseDetailViewModel @Inject constructor(
             )
         }.sortedBy { it.startedAt }
 
+        val unit = user?.unitSystem ?: UnitSystem.METRIC
+        val samples = sessions.map {
+            Predictor.Sample(it.startedAt, it.topSetWeightKg ?: it.bestWeightKg, it.topSetReps ?: 0)
+        }
         ExerciseDetailUiState(
             isLoading = false,
             exercise = exercise,
-            unit = user?.unitSystem ?: UnitSystem.METRIC,
+            unit = unit,
             records = records.sortedBy { it.recordType.ordinal },
             sessions = sessions,
-            metric = selected
+            metric = selected,
+            forecast = Predictor.forecast(samples, focus, if (unit == UnitSystem.METRIC) 2.5 else TrainingMath.lbToKg(5.0)),
+            projected1RmKg = Predictor.projectOneRm(samples, weeksAhead = 4)
         )
     }
         .catch { e -> emit(ExerciseDetailUiState(isLoading = false, error = e.userMessage("Could not load this exercise"))) }

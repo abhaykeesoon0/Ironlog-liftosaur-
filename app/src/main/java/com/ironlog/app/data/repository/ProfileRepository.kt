@@ -32,6 +32,7 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.ironlog.app.data.entity.MuscleTint
+import com.ironlog.app.data.entity.TrainingFocus
 
 /**
  * Marks an avatar value as one of the app's built-in figures rather than a
@@ -100,6 +101,9 @@ interface ProfileRepository {
     suspend fun setPlateSet(plateSet: PlateSet): Result<Unit>
     suspend fun setStepSource(source: StepSource): Result<Unit>
     val muscleTint: Flow<MuscleTint>
+    /** What the user trains for; shapes every prediction. */
+    val trainingFocus: Flow<TrainingFocus>
+    suspend fun setTrainingFocus(focus: TrainingFocus): Result<Unit>
     /** How long the app may be in the background before the lock asks again. */
     val lockGraceSeconds: Flow<Int>
     /** Whether the introduction has been seen on this device. Device-level: there is no user yet. */
@@ -184,6 +188,16 @@ class ProfileRepositoryImpl @Inject constructor(
 
     override suspend fun setMuscleTint(tint: MuscleTint): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { dataStore.edit { prefs -> prefs[KEY_MUSCLE_TINT] = tint.name }; Unit }
+    }
+
+    override val trainingFocus: Flow<TrainingFocus> = dataStore.data.map { prefs ->
+        prefs[KEY_TRAINING_FOCUS]
+            ?.let { runCatching { TrainingFocus.valueOf(it) }.getOrNull() }
+            ?: TrainingFocus.GENERAL
+    }
+
+    override suspend fun setTrainingFocus(focus: TrainingFocus): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { dataStore.edit { prefs -> prefs[KEY_TRAINING_FOCUS] = focus.name }; Unit }
     }
 
     override val stepSource: Flow<StepSource> = dataStore.data.map { prefs ->
@@ -345,6 +359,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_PLATE_SET = stringPreferencesKey("plate_set")
         val KEY_STEP_SOURCE = stringPreferencesKey("step_source")
         val KEY_MUSCLE_TINT = stringPreferencesKey("muscle_tint")
+        val KEY_TRAINING_FOCUS = stringPreferencesKey("training_focus")
         val KEY_LOCK_GRACE = intPreferencesKey("lock_grace_seconds")
         val KEY_ONBOARDED = booleanPreferencesKey("onboarding_done")
         val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")

@@ -98,6 +98,9 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.ironlog.app.ui.components.UndoSnackbar
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.ui.text.style.TextAlign
+import com.ironlog.app.domain.usecase.Predictor
+import com.ironlog.app.ui.format.formatWeight
 
 @Composable
 fun ActiveWorkoutScreen(
@@ -556,6 +559,10 @@ private fun ExerciseCard(
                 Spacer(Modifier.height(Space.xs))
                 Text(block.item.workoutExercise.notes, style = MaterialTheme.typography.bodySmall, color = ChalkDim)
             }
+            block.forecast?.takeIf { category.tracksReps }?.let { forecast ->
+                Spacer(Modifier.height(Space.sm))
+                ForecastRow(forecast, unit) { viewModel.applyForecast(block.id) }
+            }
             Spacer(Modifier.height(Space.sm))
             SetHeaderRow(category, unit)
             Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
@@ -590,6 +597,33 @@ private fun ExerciseCard(
             }
             Caption("Tap a set number to change its type · hold it for more options")
         }
+    }
+}
+
+/**
+ * What the next top set is expected to be, worked out on the phone from the
+ * exercise's past sessions and the user's training focus. "Use" writes it
+ * into the empty rows; a prediction that has to be retyped is not a help.
+ */
+@Composable
+private fun ForecastRow(forecast: Predictor.Forecast, unit: UnitSystem, onUse: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Slate800, RoundedCornerShape(Radius.card))
+            .padding(horizontal = Space.md, vertical = Space.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Caption("PREDICTED NEXT")
+            Text(
+                "${unit.formatWeight(forecast.weightKg)} \u00d7 ${forecast.reps} \u00b7 ${forecast.sets} sets",
+                style = NumericType.setCell.copy(textAlign = TextAlign.Start),
+                color = Chalk
+            )
+            Caption(Predictor.describe(forecast))
+        }
+        TextButton(onClick = onUse) { Text("Use", color = Chalk) }
     }
 }
 

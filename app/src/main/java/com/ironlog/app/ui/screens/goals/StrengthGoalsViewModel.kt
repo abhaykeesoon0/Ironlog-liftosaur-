@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.ironlog.app.domain.usecase.Predictor
 
 /** One goal with everything the card needs to draw itself. */
 data class GoalCard(
@@ -36,7 +37,10 @@ data class GoalCard(
     val remainingKg: Double,
     val isAchieved: Boolean,
     val series: List<StrengthGoalMath.SessionValue>
-)
+) {
+    /** Weeks until the recent trend reaches the target, or null when it is not heading there. */
+    val weeksToGo: Int? get() = Predictor.weeksToReach(series.map { it.startedAt to it.valueKg }, targetKg)
+}
 
 data class GoalsUiState(
     val isLoading: Boolean = true,

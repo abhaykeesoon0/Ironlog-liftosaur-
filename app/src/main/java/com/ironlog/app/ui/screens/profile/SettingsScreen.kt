@@ -79,6 +79,7 @@ import com.ironlog.app.data.repository.LOCK_GRACE_OPTIONS
 import com.ironlog.app.ui.components.ConfirmDialog
 import com.ironlog.app.ui.components.PassphraseDialog
 import androidx.compose.material.icons.filled.Info
+import com.ironlog.app.data.entity.TrainingFocus
 
 @Composable
 fun SettingsScreen(
@@ -92,6 +93,7 @@ fun SettingsScreen(
     val welcomeSound by viewModel.welcomeSound.collectAsStateWithLifecycle()
     val equipment by viewModel.equipment.collectAsStateWithLifecycle()
     val muscleTint by viewModel.muscleTint.collectAsStateWithLifecycle()
+    val trainingFocus by viewModel.trainingFocus.collectAsStateWithLifecycle()
     val stepSource by viewModel.stepSource.collectAsStateWithLifecycle()
     var assistantKey by remember { mutableStateOf("") }
     var keySaved by remember { mutableStateOf(viewModel.hasAssistantKey()) }
@@ -286,6 +288,30 @@ fun SettingsScreen(
                             Modifier.padding(top = Space.xs)
                         )
                     }
+                }
+            }
+
+            // ---------------------------------------------------------- training
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Training")
+            IronCard {
+                Column {
+                    Text("Training for", style = MaterialTheme.typography.bodyLarge, color = Chalk)
+                    Spacer(Modifier.height(Space.sm))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        TrainingFocus.entries.forEach { option ->
+                            IronChip(
+                                text = option.label,
+                                selected = trainingFocus == option,
+                                onClick = { viewModel.setTrainingFocus(option) }
+                            )
+                        }
+                    }
+                    Caption(
+                        "${trainingFocus.blurb}. Predictions of your next sets are written for " +
+                        "${trainingFocus.reps} reps and worked out from your own sessions, on this phone.",
+                        Modifier.padding(top = Space.sm)
+                    )
                 }
             }
 
