@@ -52,7 +52,7 @@ fun MusclePartMap(
     selected: MusclePart?,
     onPartClick: (MusclePart) -> Unit,
     modifier: Modifier = Modifier,
-    height: Dp = 250.dp
+    height: Dp = 360.dp
 ) {
     val worked = intensity.filterValues { it > 0f }.keys
     val description = if (worked.isEmpty()) {
