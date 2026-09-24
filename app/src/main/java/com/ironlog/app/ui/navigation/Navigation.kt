@@ -65,6 +65,18 @@ import com.ironlog.app.ui.screens.nutrition.PlanScreen
 import com.ironlog.app.ui.screens.onboarding.OnboardingScreen
 import com.ironlog.app.ui.screens.home.CustomiseHomeScreen
 import com.ironlog.app.ui.screens.profile.PrivacyScreen
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalConfiguration
+import com.ironlog.app.ui.theme.Space
 
 object Routes {
     const val SIGN_IN = "auth/sign-in"
@@ -166,10 +178,15 @@ fun MainNavHost(
         onDeepLinkConsumed()
     }
 
+    // Phones get the bar along the bottom. Tablets and phones on their side get a
+    // rail down the left instead, and the content is held to a readable width
+    // rather than stretched across a screen it was not laid out for.
+    val wide = LocalConfiguration.current.screenWidthDp >= WIDE_DP
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            if (showBottomBar) {
+            if (showBottomBar && !wide) {
                 NavigationBar(containerColor = Slate800, tonalElevation = 0.dp) {
                     BottomTab.entries.forEach { tab ->
                         val selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true
@@ -191,10 +208,35 @@ fun MainNavHost(
             }
         }
     ) { padding ->
+        Row(Modifier.padding(padding).fillMaxSize()) {
+            if (showBottomBar && wide) {
+                NavigationRail(containerColor = Slate800) {
+                    Spacer(Modifier.height(Space.md))
+                    BottomTab.entries.forEach { tab ->
+                        val selected = currentDestination?.hierarchy?.any { it.route == tab.route } == true
+                        NavigationRailItem(
+                            selected = selected,
+                            onClick = { navController.navigateToTab(tab.route) },
+                            icon = { Icon(tab.icon, contentDescription = null) },
+                            label = { Text(tab.label) },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = Chalk,
+                                selectedTextColor = Chalk,
+                                unselectedIconColor = ChalkFaint,
+                                unselectedTextColor = ChalkFaint,
+                                indicatorColor = Slate700
+                            )
+                        )
+                    }
+                }
+            }
+            Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         NavHost(
             navController = navController,
             startDestination = Routes.HOME,
-            modifier = Modifier.padding(padding)
+            // The cap goes first: an outer fillMaxSize would take the whole width
+            // and leave the cap nothing to do.
+            modifier = (if (wide) Modifier.widthIn(max = CONTENT_MAX_DP.dp) else Modifier).fillMaxSize()
         ) {
             // ------------------------------------------------------------ tabs
             composable(Routes.HOME) {
@@ -385,6 +427,8 @@ fun MainNavHost(
                 ChangePasswordScreen(onBack = { navController.popBackStack() })
             }
         }
+            }
+        }
     }
 }
 
@@ -401,3 +445,9 @@ private fun NavHostController.navigateToTab(route: String) {
 private fun NavBackStackEntry.pickedExercises() =
     savedStateHandle.getStateFlow<ArrayList<String>?>(Routes.PICKED_EXERCISES, null)
         .collectAsStateWithLifecycle()
+
+/** From here up, a rail instead of a bar and content held to a column. Material's medium breakpoint. */
+private const val WIDE_DP = 600
+
+/** The widest a column of cards should run before lines get too long to read. */
+private const val CONTENT_MAX_DP = 720
