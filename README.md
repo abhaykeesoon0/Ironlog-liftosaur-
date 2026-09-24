@@ -1,7 +1,8 @@
-# IronLog
+# Liftosaur
 
 Android strength-training tracker built for a Mobile Application Development
-coursework assignment.
+coursework assignment. (Formerly IronLog; the package `com.ironlog.app` and
+the `IronLog` log tag keep the original name.)
 
 ## Features
 
