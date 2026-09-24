@@ -18,7 +18,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.ironlog.app.HiltTestRunner"
         vectorDrawables { useSupportLibrary = true }
 
         ksp { arg("room.schemaLocation", "$projectDir/schemas") }
@@ -46,6 +46,10 @@ android {
 
     // The kotlinOptions DSL was removed in Kotlin 2.3; the compiler is
     // configured through the Kotlin extension below instead.
+
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
 
     buildFeatures {
         compose = true
@@ -110,6 +114,13 @@ dependencies {
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    // Every migration is walked from version 1 against the exported schemas.
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.hilt.android.testing)
+    // Same serialization runtime as the app, so the test APK cannot shadow it with another version.
+    androidTestImplementation(libs.kotlinx.serialization.json)
+    kspAndroidTest(libs.hilt.compiler)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)

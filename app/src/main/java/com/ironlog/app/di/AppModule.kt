@@ -17,9 +17,8 @@ import com.ironlog.app.data.dao.StrengthGoalDao
 import com.ironlog.app.data.dao.UserDao
 import com.ironlog.app.data.dao.WorkoutDao
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStoreFile
+import androidx.datastore.preferences.preferencesDataStore
 import com.ironlog.app.data.repository.AuthRepository
 import com.ironlog.app.data.repository.AuthRepositoryImpl
 import com.ironlog.app.data.repository.BodyRepository
@@ -278,12 +277,20 @@ object DatabaseModule {
     @Provides fun provideRewardsDao(db: AppDatabase): RewardsDao = db.rewardsDao()
     @Provides fun provideNutritionDao(db: AppDatabase): NutritionDao = db.nutritionDao()
 
-    /** Non-sensitive preferences only; session secrets live in SecureTokenStore. */
+    /**
+     * Non-sensitive preferences only; session secrets live in SecureTokenStore.
+     *
+     * Read through the process-wide delegate rather than created here, because
+     * DataStore allows exactly one instance per file per process: a second Hilt
+     * graph in the same process -- which is what every instrumented test makes
+     * -- would otherwise open the file twice and crash.
+     */
     @Provides
     @Singleton
-    fun providePreferences(@ApplicationContext context: Context): DataStore<Preferences> =
-        PreferenceDataStoreFactory.create { context.preferencesDataStoreFile("ironlog_prefs") }
+    fun providePreferences(@ApplicationContext context: Context): DataStore<Preferences> = context.preferences
 }
+
+private val Context.preferences: DataStore<Preferences> by preferencesDataStore(name = "ironlog_prefs")
 
 @Module
 @InstallIn(SingletonComponent::class)

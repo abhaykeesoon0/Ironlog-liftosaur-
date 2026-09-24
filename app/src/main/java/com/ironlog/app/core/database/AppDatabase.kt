@@ -77,5 +77,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "ironlog.db"
+
+        /** Kept beside the annotation; the migration test walks from 1 to here. */
+        const val VERSION = 6
     }
 }
