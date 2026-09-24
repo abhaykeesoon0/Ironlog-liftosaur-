@@ -33,6 +33,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.ironlog.app.data.entity.MuscleTint
 import com.ironlog.app.data.entity.TrainingFocus
+import com.ironlog.app.data.entity.HomeSection
 
 /**
  * Marks an avatar value as one of the app's built-in figures rather than a
@@ -103,6 +104,9 @@ interface ProfileRepository {
     val muscleTint: Flow<MuscleTint>
     /** What the user trains for; shapes every prediction. */
     val trainingFocus: Flow<TrainingFocus>
+    /** The Home cards the user shows, in order. */
+    val homeSections: Flow<List<HomeSection>>
+    suspend fun setHomeSections(sections: List<HomeSection>): Result<Unit>
     suspend fun setTrainingFocus(focus: TrainingFocus): Result<Unit>
     /** How long the app may be in the background before the lock asks again. */
     val lockGraceSeconds: Flow<Int>
@@ -188,6 +192,15 @@ class ProfileRepositoryImpl @Inject constructor(
 
     override suspend fun setMuscleTint(tint: MuscleTint): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { dataStore.edit { prefs -> prefs[KEY_MUSCLE_TINT] = tint.name }; Unit }
+    }
+
+    override val homeSections: Flow<List<HomeSection>> = dataStore.data.map { prefs ->
+        val stored = prefs[KEY_HOME_SECTIONS] ?: return@map HomeSection.entries.toList()
+        stored.split(',').mapNotNull { name -> runCatching { HomeSection.valueOf(name.trim()) }.getOrNull() }
+    }
+
+    override suspend fun setHomeSections(sections: List<HomeSection>): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { dataStore.edit { prefs -> prefs[KEY_HOME_SECTIONS] = sections.joinToString(",") { it.name } }; Unit }
     }
 
     override val trainingFocus: Flow<TrainingFocus> = dataStore.data.map { prefs ->
@@ -360,6 +373,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_STEP_SOURCE = stringPreferencesKey("step_source")
         val KEY_MUSCLE_TINT = stringPreferencesKey("muscle_tint")
         val KEY_TRAINING_FOCUS = stringPreferencesKey("training_focus")
+        val KEY_HOME_SECTIONS = stringPreferencesKey("home_sections")
         val KEY_LOCK_GRACE = intPreferencesKey("lock_grace_seconds")
         val KEY_ONBOARDED = booleanPreferencesKey("onboarding_done")
         val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")

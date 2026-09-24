@@ -108,6 +108,8 @@ import com.ironlog.app.domain.usecase.MuscleParts
 import com.ironlog.app.ui.components.IronChip
 import com.ironlog.app.ui.components.MusclePartMap
 import com.ironlog.app.ui.theme.Slate800
+import com.ironlog.app.data.entity.HomeSection
+import androidx.compose.material.icons.filled.Tune
 
 @Composable
 fun HomeScreen(
@@ -120,6 +122,7 @@ fun HomeScreen(
     onOpenQuests: () -> Unit,
     onOpenCoach: () -> Unit,
     onOpenNutrition: () -> Unit,
+    onCustomise: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
     goalsViewModel: HomeGoalsViewModel = hiltViewModel(),
     questsViewModel: QuestsViewModel = hiltViewModel(),
@@ -198,331 +201,354 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.height(Space.xl))
-        SectionHeader("This week")
-        IronCard {
-            Column {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    StatTile(
-                        value = "${state.workoutsThisWeek}/${state.weeklyGoal}",
-                        label = "Workouts"
-                    )
-                    StatTile(value = state.unit.formatVolume(state.volumeThisWeekKg), label = "Volume")
-                    StatTile(
-                        value = state.streakWeeks.toString(),
-                        label = "Week streak",
-                        accent = if (state.streakWeeks > 0) PrGold else Chalk
-                    )
-                }
-                Spacer(Modifier.height(Space.md))
-                val progress = (state.workoutsThisWeek.toFloat() / state.weeklyGoal.coerceAtLeast(1)).coerceIn(0f, 1f)
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .semantics {
-                            contentDescription = "${state.workoutsThisWeek} of ${state.weeklyGoal} workouts this week"
-                        },
-                    color = Plate10,
-                    trackColor = Slate700,
-                    drawStopIndicator = {}
-                )
-                Spacer(Modifier.height(Space.xs))
-                Caption(
-                    if (state.workoutsThisWeek >= state.weeklyGoal) "Weekly goal reached"
-                    else "${state.weeklyGoal - state.workoutsThisWeek} to go for your weekly goal"
-                )
-            }
-        }
-
-        // ------------------------------------------------------- muscle map
-        if (state.muscleWeeks.isNotEmpty()) {
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Muscles trained")
-            MuscleMapCard(state.muscleWeeks, state.muscleTint, state.unit)
-        }
-
-        Spacer(Modifier.height(Space.xl))
-        SectionHeader("Today")
-        IronCard {
-            Column {
-                val fromWatch = state.stepSource == StepSource.HEALTH_CONNECT
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = ChalkDim, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(Space.sm))
-                    when {
-                        fromWatch && state.healthConnectReady -> Text(
-                            "%,d steps".format(state.todaySteps),
-                            style = NumericType.stat,
-                            color = Chalk
-                        )
-                        fromWatch -> Text(
-                            "Not connected yet",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = ChalkDim
-                        )
-                        !state.stepSensorAvailable -> Text(
-                            "This phone has no step counter",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = ChalkDim
-                        )
-                        stepsPermission.isGranted -> Text(
-                            "%,d steps".format(state.todaySteps),
-                            style = NumericType.stat,
-                            color = Chalk
-                        )
-                        else -> Text("Steps are off", style = MaterialTheme.typography.bodyLarge, color = ChalkDim)
-                    }
-                }
-                Spacer(Modifier.height(Space.xs))
-                Caption(
-                    if (fromWatch) "From Health Connect, including your watch"
-                    else "From your phone's built-in step counter"
-                )
-
-                if (fromWatch && !state.healthConnectReady) {
-                    Spacer(Modifier.height(Space.md))
-                    SecondaryButton(
-                        text = "Connect Health Connect",
-                        onClick = { healthConnectRequest.launch(viewModel.healthConnectPermissions()) }
-                    )
-                } else if (!fromWatch && state.stepSensorAvailable && !stepsPermission.isGranted) {
-                    Spacer(Modifier.height(Space.md))
-                    SecondaryButton(
-                        text = "Count my steps",
-                        onClick = { stepsPermission.runWithPermission { viewModel.startSteps() } }
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(Space.md))
-        NutritionCard(onOpen = onOpenNutrition)
-
-        Spacer(Modifier.height(Space.md))
-        IronCard(onClick = onOpenCardio) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.AutoMirrored.Filled.DirectionsRun, contentDescription = null, tint = Chalk)
-                Spacer(Modifier.width(Space.md))
-                Column(Modifier.weight(1f)) {
-                    Text("Outdoor cardio", style = MaterialTheme.typography.titleMedium, color = Chalk)
-                    Caption("Record a run, walk or ride with GPS")
-                }
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
-            }
-        }
-
-        Spacer(Modifier.height(Space.xl))
-        SectionHeader("Coach")
-        IronCard(onClick = onOpenCoach) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.QuestionAnswer,
-                    contentDescription = null,
-                    tint = ChalkDim,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(Modifier.width(Space.md))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Ask about training",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Chalk
-                    )
-                    Caption("What to train today, how to progress, how you are doing.")
-                }
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
-            }
-        }
-
-        Spacer(Modifier.height(Space.xl))
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SectionHeader("Quests", Modifier.weight(1f))
-            CoinPill(quests.balance)
-        }
-        IronCard(onClick = onOpenQuests) {
-            Column {
-                val claimable = quests.quests.count { it.isClaimable }
-                val inProgress = quests.quests.count { !it.isClaimed && !it.isComplete }
-                Text(
-                    when {
-                        claimable == 1 -> "1 reward waiting"
-                        claimable > 1 -> "$claimable rewards waiting"
-                        else -> "No rewards waiting"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (claimable > 0) PrGold else Chalk
-                )
-                Caption(
-                    if (claimable > 0) "Claim them, then spend the coins in the store."
-                    else "$inProgress quest(s) still in progress. Coins come from training, not from tapping."
-                )
-            }
-        }
-
-        if (state.recovery.isNotEmpty()) {
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Recovery")
-            IronCard {
-                Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
-                    // Anything not in the list has not been trained recently
-                    // enough to still be recovering, so it is ready.
-                    BodyMap(readiness = state.recovery.associate { it.muscle to it.fraction })
-                    state.recovery.take(RECOVERY_ROWS).forEach { muscle ->
-                        RecoveryRow(muscle)
-                    }
-                    val hidden = state.recovery.size - RECOVERY_ROWS
-                    if (hidden > 0) Caption("$hidden more fully recovered")
-                }
-            }
-        }
-
-        if (goals.isNotEmpty()) {
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Strength goals")
-            IronCard(onClick = onOpenGoals) {
-                Column(verticalArrangement = Arrangement.spacedBy(Space.lg)) {
-                    goals.take(HOME_GOALS).forEach { goal ->
-                        GoalSummaryRow(goal, state.unit)
-                    }
-                    val hidden = goals.size - HOME_GOALS
-                    if (hidden > 0) Caption("$hidden more")
-                }
-            }
-        } else {
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Strength goals")
-            IronCard(onClick = onOpenGoals) {
-                Column {
-                    Text(
-                        "Set a target on a lift",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Chalk
-                    )
-                    Caption("Track the share of it you have reached, read straight from your logged sets.")
-                }
-            }
-        }
-
-        if (equipped.widgetIds.contains("widget_plates") || equipped.widgetIds.contains("widget_1rm")) {
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Your widgets")
-            Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
-                if (equipped.widgetIds.contains("widget_plates")) {
-                    PlateCalculatorWidget(state.unit, state.equipment)
-                }
-                if (equipped.widgetIds.contains("widget_1rm")) OneRepMaxWidget(state.unit)
-            }
-        }
-
-        val recent = state.recentBlock
-        if (recent.workouts > 0) {
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Last ${recent.workouts} workouts")
-            IronCard {
-                Column {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatTile(state.unit.formatVolume(recent.totalVolumeKg), "Total volume")
-                        StatTile(formatDuration(recent.totalDurationSeconds), "Total time")
-                    }
-                    Spacer(Modifier.height(Space.lg))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatTile(formatDuration(recent.averageDurationSeconds), "Average session")
-                        StatTile(
-                            recent.recordsBroken.toString(),
-                            "Records broken",
-                            accent = if (recent.recordsBroken > 0) PrGold else Chalk
-                        )
-                    }
-                    if (recent.workouts < HomeViewModel.RECENT_WINDOW) {
+        // Every card below is the user's to hide or reorder; see CustomiseHomeScreen.
+        state.sections.forEach { section ->
+            when (section) {
+                HomeSection.THIS_WEEK -> {
+                Spacer(Modifier.height(Space.xl))
+                SectionHeader("This week")
+                IronCard {
+                    Column {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            StatTile(
+                                value = "${state.workoutsThisWeek}/${state.weeklyGoal}",
+                                label = "Workouts"
+                            )
+                            StatTile(value = state.unit.formatVolume(state.volumeThisWeekKg), label = "Volume")
+                            StatTile(
+                                value = state.streakWeeks.toString(),
+                                label = "Week streak",
+                                accent = if (state.streakWeeks > 0) PrGold else Chalk
+                            )
+                        }
                         Spacer(Modifier.height(Space.md))
-                        Caption("Everything you have logged so far, up to your last ${HomeViewModel.RECENT_WINDOW} sessions.")
-                    }
-                }
-            }
-        }
-
-        val bodyweight = state.bodyweight
-        if (bodyweight.size >= 2) {
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Bodyweight")
-            IronCard(onClick = onOpenBody) {
-                LineChart(
-                    points = bodyweight.map { point ->
-                        ChartPoint(
-                            formatShortDate(point.takenAt),
-                            state.unit.weightValue(point.weightKg).toFloatOrNull() ?: 0f
+                        val progress = (state.workoutsThisWeek.toFloat() / state.weeklyGoal.coerceAtLeast(1)).coerceIn(0f, 1f)
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .semantics {
+                                    contentDescription = "${state.workoutsThisWeek} of ${state.weeklyGoal} workouts this week"
+                                },
+                            color = Plate10,
+                            trackColor = Slate700,
+                            drawStopIndicator = {}
                         )
-                    },
-                    color = Plate20,
-                    valueFormatter = { "${it.toDouble().trimmed(1)} ${state.unit.weightSuffix}" },
-                    description = "Bodyweight over time"
-                )
-            }
-        }
-
-        state.lastWorkout?.let { last ->
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Last workout")
-            IronCard(onClick = { onOpenWorkout(last.id) }) {
-                Column {
-                    Text(last.name, style = MaterialTheme.typography.titleMedium, color = Chalk)
-                    Caption(formatRelativeDay(last.startedAt))
-                    Spacer(Modifier.height(Space.md))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        StatTile(formatDuration(last.durationSeconds), "Duration")
-                        StatTile(state.unit.formatVolume(last.totalVolumeKg), "Volume")
-                        StatTile(
-                            last.prCount.toString(),
-                            "PRs",
-                            accent = if (last.prCount > 0) PrGold else Chalk
+                        Spacer(Modifier.height(Space.xs))
+                        Caption(
+                            if (state.workoutsThisWeek >= state.weeklyGoal) "Weekly goal reached"
+                            else "${state.weeklyGoal - state.workoutsThisWeek} to go for your weekly goal"
                         )
                     }
                 }
-            }
-        }
-
-        if (state.recentRecords.isNotEmpty()) {
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Recent records")
-            IronCard {
-                Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
-                    state.recentRecords.forEach { item ->
-                        val r = item.record
+                }
+                HomeSection.MUSCLES -> {
+                // ------------------------------------------------------- muscle map
+                if (state.muscleWeeks.isNotEmpty()) {
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Muscles trained")
+                    MuscleMapCard(state.muscleWeeks, state.muscleTint, state.unit)
+                }
+                }
+                HomeSection.TODAY -> {
+                Spacer(Modifier.height(Space.xl))
+                SectionHeader("Today")
+                IronCard {
+                    Column {
+                        val fromWatch = state.stepSource == StepSource.HEALTH_CONNECT
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    item.exerciseName,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = Chalk,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    PrBadge(r.recordType)
-                                    Spacer(Modifier.width(Space.sm))
-                                    Caption(formatRelativeDay(r.achievedAt))
-                                }
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    formatRecordValue(r.recordType, r.value, state.unit),
-                                    style = NumericType.small.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize),
+                            Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = ChalkDim, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(Space.sm))
+                            when {
+                                fromWatch && state.healthConnectReady -> Text(
+                                    "%,d steps".format(state.todaySteps),
+                                    style = NumericType.stat,
                                     color = Chalk
                                 )
-                                formatRecordContext(r.recordType, r.weightKg, r.reps, state.unit)?.let { Caption(it) }
+                                fromWatch -> Text(
+                                    "Not connected yet",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = ChalkDim
+                                )
+                                !state.stepSensorAvailable -> Text(
+                                    "This phone has no step counter",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = ChalkDim
+                                )
+                                stepsPermission.isGranted -> Text(
+                                    "%,d steps".format(state.todaySteps),
+                                    style = NumericType.stat,
+                                    color = Chalk
+                                )
+                                else -> Text("Steps are off", style = MaterialTheme.typography.bodyLarge, color = ChalkDim)
+                            }
+                        }
+                        Spacer(Modifier.height(Space.xs))
+                        Caption(
+                            if (fromWatch) "From Health Connect, including your watch"
+                            else "From your phone's built-in step counter"
+                        )
+
+                        if (fromWatch && !state.healthConnectReady) {
+                            Spacer(Modifier.height(Space.md))
+                            SecondaryButton(
+                                text = "Connect Health Connect",
+                                onClick = { healthConnectRequest.launch(viewModel.healthConnectPermissions()) }
+                            )
+                        } else if (!fromWatch && state.stepSensorAvailable && !stepsPermission.isGranted) {
+                            Spacer(Modifier.height(Space.md))
+                            SecondaryButton(
+                                text = "Count my steps",
+                                onClick = { stepsPermission.runWithPermission { viewModel.startSteps() } }
+                            )
+                        }
+                    }
+                }
+                }
+                HomeSection.NUTRITION -> {
+                Spacer(Modifier.height(Space.xl))
+                NutritionCard(onOpen = onOpenNutrition)
+                }
+                HomeSection.CARDIO -> {
+                Spacer(Modifier.height(Space.xl))
+                IronCard(onClick = onOpenCardio) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.AutoMirrored.Filled.DirectionsRun, contentDescription = null, tint = Chalk)
+                        Spacer(Modifier.width(Space.md))
+                        Column(Modifier.weight(1f)) {
+                            Text("Outdoor cardio", style = MaterialTheme.typography.titleMedium, color = Chalk)
+                            Caption("Record a run, walk or ride with GPS")
+                        }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
+                    }
+                }
+                }
+                HomeSection.COACH -> {
+                Spacer(Modifier.height(Space.xl))
+                SectionHeader("Coach")
+                IronCard(onClick = onOpenCoach) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.QuestionAnswer,
+                            contentDescription = null,
+                            tint = ChalkDim,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(Space.md))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Ask about training",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Chalk
+                            )
+                            Caption("What to train today, how to progress, how you are doing.")
+                        }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ChalkFaint)
+                    }
+                }
+                }
+                HomeSection.QUESTS -> {
+                Spacer(Modifier.height(Space.xl))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionHeader("Quests", Modifier.weight(1f))
+                    CoinPill(quests.balance)
+                }
+                IronCard(onClick = onOpenQuests) {
+                    Column {
+                        val claimable = quests.quests.count { it.isClaimable }
+                        val inProgress = quests.quests.count { !it.isClaimed && !it.isComplete }
+                        Text(
+                            when {
+                                claimable == 1 -> "1 reward waiting"
+                                claimable > 1 -> "$claimable rewards waiting"
+                                else -> "No rewards waiting"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (claimable > 0) PrGold else Chalk
+                        )
+                        Caption(
+                            if (claimable > 0) "Claim them, then spend the coins in the store."
+                            else "$inProgress quest(s) still in progress. Coins come from training, not from tapping."
+                        )
+                    }
+                }
+                }
+                HomeSection.RECOVERY -> {
+                if (state.recovery.isNotEmpty()) {
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Recovery")
+                    IronCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                            // Anything not in the list has not been trained recently
+                            // enough to still be recovering, so it is ready.
+                            BodyMap(readiness = state.recovery.associate { it.muscle to it.fraction })
+                            state.recovery.take(RECOVERY_ROWS).forEach { muscle ->
+                                RecoveryRow(muscle)
+                            }
+                            val hidden = state.recovery.size - RECOVERY_ROWS
+                            if (hidden > 0) Caption("$hidden more fully recovered")
+                        }
+                    }
+                }
+                }
+                HomeSection.GOALS -> {
+                if (goals.isNotEmpty()) {
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Strength goals")
+                    IronCard(onClick = onOpenGoals) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.lg)) {
+                            goals.take(HOME_GOALS).forEach { goal ->
+                                GoalSummaryRow(goal, state.unit)
+                            }
+                            val hidden = goals.size - HOME_GOALS
+                            if (hidden > 0) Caption("$hidden more")
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Strength goals")
+                    IronCard(onClick = onOpenGoals) {
+                        Column {
+                            Text(
+                                "Set a target on a lift",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Chalk
+                            )
+                            Caption("Track the share of it you have reached, read straight from your logged sets.")
+                        }
+                    }
+                }
+                }
+                HomeSection.WIDGETS -> {
+                if (equipped.widgetIds.contains("widget_plates") || equipped.widgetIds.contains("widget_1rm")) {
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Your widgets")
+                    Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                        if (equipped.widgetIds.contains("widget_plates")) {
+                            PlateCalculatorWidget(state.unit, state.equipment)
+                        }
+                        if (equipped.widgetIds.contains("widget_1rm")) OneRepMaxWidget(state.unit)
+                    }
+                }
+                }
+                HomeSection.RECENT_BLOCK -> {
+                val recent = state.recentBlock
+                if (recent.workouts > 0) {
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Last ${recent.workouts} workouts")
+                    IronCard {
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                StatTile(state.unit.formatVolume(recent.totalVolumeKg), "Total volume")
+                                StatTile(formatDuration(recent.totalDurationSeconds), "Total time")
+                            }
+                            Spacer(Modifier.height(Space.lg))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                StatTile(formatDuration(recent.averageDurationSeconds), "Average session")
+                                StatTile(
+                                    recent.recordsBroken.toString(),
+                                    "Records broken",
+                                    accent = if (recent.recordsBroken > 0) PrGold else Chalk
+                                )
+                            }
+                            if (recent.workouts < HomeViewModel.RECENT_WINDOW) {
+                                Spacer(Modifier.height(Space.md))
+                                Caption("Everything you have logged so far, up to your last ${HomeViewModel.RECENT_WINDOW} sessions.")
                             }
                         }
                     }
                 }
+                }
+                HomeSection.BODYWEIGHT -> {
+                val bodyweight = state.bodyweight
+                if (bodyweight.size >= 2) {
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Bodyweight")
+                    IronCard(onClick = onOpenBody) {
+                        LineChart(
+                            points = bodyweight.map { point ->
+                                ChartPoint(
+                                    formatShortDate(point.takenAt),
+                                    state.unit.weightValue(point.weightKg).toFloatOrNull() ?: 0f
+                                )
+                            },
+                            color = Plate20,
+                            valueFormatter = { "${it.toDouble().trimmed(1)} ${state.unit.weightSuffix}" },
+                            description = "Bodyweight over time"
+                        )
+                    }
+                }
+                }
+                HomeSection.LAST_WORKOUT -> {
+                state.lastWorkout?.let { last ->
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Last workout")
+                    IronCard(onClick = { onOpenWorkout(last.id) }) {
+                        Column {
+                            Text(last.name, style = MaterialTheme.typography.titleMedium, color = Chalk)
+                            Caption(formatRelativeDay(last.startedAt))
+                            Spacer(Modifier.height(Space.md))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                StatTile(formatDuration(last.durationSeconds), "Duration")
+                                StatTile(state.unit.formatVolume(last.totalVolumeKg), "Volume")
+                                StatTile(
+                                    last.prCount.toString(),
+                                    "PRs",
+                                    accent = if (last.prCount > 0) PrGold else Chalk
+                                )
+                            }
+                        }
+                    }
+                }
+                }
+                HomeSection.RECORDS -> {
+                if (state.recentRecords.isNotEmpty()) {
+                    Spacer(Modifier.height(Space.xl))
+                    SectionHeader("Recent records")
+                    IronCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                            state.recentRecords.forEach { item ->
+                                val r = item.record
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            item.exerciseName,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Chalk,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            PrBadge(r.recordType)
+                                            Spacer(Modifier.width(Space.sm))
+                                            Caption(formatRelativeDay(r.achievedAt))
+                                        }
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            formatRecordValue(r.recordType, r.value, state.unit),
+                                            style = NumericType.small.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize),
+                                            color = Chalk
+                                        )
+                                        formatRecordContext(r.recordType, r.weightKg, r.reps, state.unit)?.let { Caption(it) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                }
             }
         }
+
+        Spacer(Modifier.height(Space.xl))
+        SecondaryButton(text = "Customise this screen", onClick = onCustomise, leadingIcon = Icons.Default.Tune)
 
         Spacer(Modifier.height(Space.section))
     }

@@ -34,6 +34,7 @@ import com.ironlog.app.core.sensors.HealthConnectWriter
 import com.ironlog.app.data.entity.MuscleGroup
 import com.ironlog.app.data.entity.MuscleTint
 import com.ironlog.app.domain.usecase.MuscleParts
+import com.ironlog.app.data.entity.HomeSection
 
 data class ActiveWorkoutInfo(val id: String, val name: String, val startedAt: Long, val completedSets: Int)
 
@@ -63,6 +64,8 @@ data class HomeUiState(
     /** The last four weeks of work by muscle part, newest first, for the muscle map. */
     val muscleWeeks: List<MuscleParts.Week> = emptyList(),
     val muscleTint: MuscleTint = MuscleTint.PLUM,
+    /** The cards to show, in order; the user's own layout. */
+    val sections: List<HomeSection> = HomeSection.entries.toList(),
     val error: String? = null
 )
 
@@ -179,6 +182,12 @@ class HomeViewModel @Inject constructor(
             profileRepository.equipment
                 .catch { e -> _state.update { it.copy(error = e.userMessage("Could not load your equipment settings")) } }
                 .collect { equipment -> _state.update { it.copy(equipment = equipment) } }
+        }
+
+        viewModelScope.launch {
+            profileRepository.homeSections
+                .catch { e -> _state.update { it.copy(error = e.userMessage("Could not read the Home layout")) } }
+                .collect { sections -> _state.update { it.copy(sections = sections) } }
         }
 
         viewModelScope.launch {

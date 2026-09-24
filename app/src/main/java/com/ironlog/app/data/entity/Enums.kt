@@ -169,6 +169,24 @@ enum class TrainingFocus(val label: String, val reps: Int, val sets: Int, val bl
     GENERAL("General", 8, 3, "A middle ground")
 }
 
+/** The cards on Home, in their default order. The user can hide and reorder them. */
+enum class HomeSection(val label: String, val blurb: String) {
+    THIS_WEEK("This week", "Workouts, volume and streak against your weekly goal"),
+    MUSCLES("Muscles trained", "The body map, shaded by the week's sets"),
+    TODAY("Today's steps", "From the phone or Health Connect"),
+    NUTRITION("Nutrition", "Calories logged today against the target"),
+    CARDIO("Outdoor cardio", "Start a GPS session"),
+    COACH("Coach", "Ask about training"),
+    QUESTS("Quests", "Rewards waiting and coins"),
+    RECOVERY("Recovery", "Which muscles are still recovering"),
+    GOALS("Strength goals", "Progress towards each target"),
+    WIDGETS("Your widgets", "Widgets bought in the store"),
+    RECENT_BLOCK("Recent workouts", "Totals over your last sessions"),
+    BODYWEIGHT("Bodyweight", "The trend from your measurements"),
+    LAST_WORKOUT("Last workout", "The most recent session"),
+    RECORDS("Recent records", "The latest personal records")
+}
+
 enum class MuscleTint(val label: String, val argb: Long) {
     PLUM("Plum", 0xFFA78BFA),
     CHALK("Chalk", 0xFFF2F5F7),
