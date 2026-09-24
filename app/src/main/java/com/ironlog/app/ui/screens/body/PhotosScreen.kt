@@ -73,6 +73,11 @@ import android.app.Activity
 import android.view.WindowManager
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Compare
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import com.ironlog.app.ui.components.PhotoCompareDialog
 
 @Composable
 fun PhotosScreen(
@@ -99,6 +104,20 @@ fun PhotosScreen(
     // storage permission is needed for this path.
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         viewModel.onPicked(uri)
+    }
+
+    // Compare mode: pick two tiles, the earlier becomes "before".
+    var comparing by remember { mutableStateOf(false) }
+    var picked by remember { mutableStateOf<List<ProgressPhotoEntity>>(emptyList()) }
+    if (picked.size == 2) {
+        val (before, after) = picked.sortedBy { it.takenAt }
+        PhotoCompareDialog(
+            beforePath = before.filePath,
+            beforeLabel = "${before.pose.label} \u00b7 ${formatShortDate(before.takenAt)}",
+            afterPath = after.filePath,
+            afterLabel = "${after.pose.label} \u00b7 ${formatShortDate(after.takenAt)}",
+            onDismiss = { picked = emptyList(); comparing = false }
+        )
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -141,6 +160,18 @@ fun PhotosScreen(
                 )
             }
             Spacer(Modifier.height(Space.lg))
+            if (state.photos.size >= 2) {
+                SecondaryButton(
+                    text = when {
+                        !comparing -> "Compare two photos"
+                        picked.isEmpty() -> "Pick the first photo"
+                        else -> "Pick the second photo"
+                    },
+                    leadingIcon = Icons.Default.Compare,
+                    onClick = { comparing = !comparing; picked = emptyList() }
+                )
+                Spacer(Modifier.height(Space.md))
+            }
             if (state.photos.isNotEmpty()) {
                 FilterChipRow(
                     options = PhotoPose.entries,
@@ -171,7 +202,14 @@ fun PhotosScreen(
                 verticalArrangement = Arrangement.spacedBy(Space.sm)
             ) {
                 items(state.visible, key = { it.id }) { photo ->
-                    PhotoTile(photo, onClick = { viewModel.view(photo) })
+                    PhotoTile(
+                        photo,
+                        selected = picked.any { it.id == photo.id },
+                        onClick = {
+                            if (!comparing) viewModel.view(photo)
+                            else picked = if (picked.any { it.id == photo.id }) picked.filter { it.id != photo.id } else (picked + photo).takeLast(2)
+                        }
+                    )
                 }
             }
         }
@@ -183,12 +221,14 @@ fun PhotosScreen(
 }
 
 @Composable
-private fun PhotoTile(photo: ProgressPhotoEntity, onClick: () -> Unit) {
+private fun PhotoTile(photo: ProgressPhotoEntity, onClick: () -> Unit, selected: Boolean = false) {
     Box(
         Modifier
             .aspectRatio(3f / 4f)
             .clip(RoundedCornerShape(Radius.control))
             .background(Slate700)
+            .then(if (selected) Modifier.border(3.dp, Chalk, RoundedCornerShape(Radius.control)) else Modifier)
+            .semantics { this.selected = selected }
             .clickable(role = Role.Image, onClickLabel = "Open photo", onClick = onClick)
     ) {
         AsyncImage(

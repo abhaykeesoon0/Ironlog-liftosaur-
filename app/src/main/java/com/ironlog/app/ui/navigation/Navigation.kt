@@ -327,7 +327,8 @@ fun MainNavHost(
             ) {
                 WorkoutDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenExercise = { navController.navigate(Routes.exerciseDetail(it)) }
+                    onOpenExercise = { navController.navigate(Routes.exerciseDetail(it)) },
+                    onRepeat = { navController.navigate(Routes.ACTIVE_WORKOUT) { popUpTo(Routes.HOME) } }
                 )
             }
 

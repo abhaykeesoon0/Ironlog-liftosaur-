@@ -49,6 +49,13 @@ interface ExerciseDao {
     @Upsert
     suspend fun upsert(exercise: ExerciseEntity)
 
+    /** A library or own custom exercise by name, ignoring case; for matching imported rows. */
+    @Query(
+        "SELECT * FROM exercises WHERE LOWER(name) = LOWER(:name) AND (ownerUserId IS NULL OR ownerUserId = :userId) " +
+            "AND isArchived = 0 ORDER BY isCustom ASC LIMIT 1"
+    )
+    suspend fun findByName(name: String, userId: String): ExerciseEntity?
+
     @Upsert
     suspend fun upsertAll(exercises: List<ExerciseEntity>)
 

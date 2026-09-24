@@ -98,6 +98,8 @@ interface WorkoutRepository {
 
     /** Starts a session, or returns the one already running. */
     suspend fun start(routineId: String?): Result<String>
+    /** Starts a new session with the exercises and set counts of a finished one. */
+    suspend fun repeat(workoutId: String): Result<String>
     suspend fun rename(workoutId: String, name: String): Result<Unit>
     suspend fun updateNotes(workoutId: String, notes: String): Result<Unit>
     suspend fun addExercises(workoutId: String, exerciseIds: List<String>): Result<Unit>
@@ -226,6 +228,44 @@ class WorkoutRepositoryImpl @Inject constructor(
                         }
                     )
                 }
+        }
+        workout.id
+    }
+
+    override suspend fun repeat(workoutId: String): Result<String> = io {
+        val userId = currentUser.require()
+        workoutDao.getActiveWorkout(userId)?.let { throw UserFacingException("Finish the workout in progress first") }
+        val source = workoutDao.getWorkout(workoutId)?.takeIf { it.workout.userId == userId }
+            ?: throw UserFacingException("Workout not found")
+        val workout = WorkoutEntity(
+            id = UUID.randomUUID().toString(),
+            userId = userId,
+            routineId = source.workout.routineId,
+            name = source.workout.name,
+            startedAt = System.currentTimeMillis(),
+            isActive = true
+        )
+        db.withTransaction {
+            workoutDao.upsertWorkout(workout)
+            source.exercises.sortedBy { it.workoutExercise.orderIndex }.forEachIndexed { index, item ->
+                val row = WorkoutExerciseEntity(
+                    id = UUID.randomUUID().toString(),
+                    workoutId = workout.id,
+                    exerciseId = item.exercise.id,
+                    orderIndex = index,
+                    restSeconds = item.workoutExercise.restSeconds,
+                    supersetGroup = item.workoutExercise.supersetGroup,
+                    notes = item.workoutExercise.notes
+                )
+                workoutDao.upsertWorkoutExercise(row)
+                // The same number of rows, empty: last time's numbers show in
+                // the PREVIOUS column, and today's are today's to enter.
+                val count = item.sets.count { it.isCompleted }.coerceAtLeast(1)
+                workoutDao.upsertSets((1..count).map { n ->
+                    WorkoutSetEntity(id = UUID.randomUUID().toString(), workoutExerciseId = row.id, setNumber = n,
+                        type = item.sets.getOrNull(n - 1)?.type ?: SetType.NORMAL)
+                })
+            }
         }
         workout.id
     }
