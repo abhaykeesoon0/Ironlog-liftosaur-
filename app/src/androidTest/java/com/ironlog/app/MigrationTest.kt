@@ -65,7 +65,8 @@ class MigrationTest {
             DatabaseModule.MIGRATION_2_3,
             DatabaseModule.MIGRATION_3_4,
             DatabaseModule.MIGRATION_4_5,
-            DatabaseModule.MIGRATION_5_6
+            DatabaseModule.MIGRATION_5_6,
+            DatabaseModule.MIGRATION_6_7
         )
 
         db.query("SELECT name, totalVolumeKg, prCount FROM workouts WHERE id = 'w1'").use { cursor ->
@@ -77,6 +78,9 @@ class MigrationTest {
         // Tables added along the way exist and are empty, not missing.
         db.query("SELECT COUNT(*) FROM foods").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
         db.query("SELECT targetWeightKg, progressionKg FROM routine_exercises LIMIT 0").use { cursor ->
+            assertEquals(2, cursor.columnCount)
+        }
+        db.query("SELECT avgHeartRate, maxHeartRate FROM cardio_sessions LIMIT 0").use { cursor ->
             assertEquals(2, cursor.columnCount)
         }
     }

@@ -202,7 +202,10 @@ data class CardioSessionEntity(
     val estimatedCalories: Int = 0,
     val steps: Int = 0,
     val routeJson: String = "[]",
-    val note: String = ""
+    val note: String = "",
+    /** From a Bluetooth strap, when one was connected; null otherwise. */
+    val avgHeartRate: Int? = null,
+    val maxHeartRate: Int? = null
 )
 
 /** Daily step totals from the hardware step counter, keyed by local date. */

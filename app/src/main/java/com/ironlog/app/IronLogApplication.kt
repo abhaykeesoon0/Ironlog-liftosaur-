@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.ironlog.app.core.widget.WidgetSync
+import com.ironlog.app.core.widget.AppShortcuts
 
 @HiltAndroidApp
 class IronLogApplication : Application() {
@@ -33,6 +34,7 @@ class IronLogApplication : Application() {
 
         // The widget follows the log for the life of the process.
         widgetSync.start(applicationScope)
+        AppShortcuts.publish(this)
 
         seedExerciseLibrary()
     }

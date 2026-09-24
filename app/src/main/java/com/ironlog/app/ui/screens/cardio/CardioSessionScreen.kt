@@ -189,6 +189,14 @@ fun CardioSessionScreen(
                         }
                         Row(Modifier.fillMaxWidth()) {
                             StatTile("${session.estimatedCalories} kcal", "Est. calories", Modifier.weight(1f))
+                            if (session.avgHeartRate != null) {
+                                StatTile("${session.avgHeartRate} bpm", "Avg heart rate", Modifier.weight(1f))
+                            }
+                        }
+                        if (session.maxHeartRate != null) {
+                            Row(Modifier.fillMaxWidth()) {
+                                StatTile("${session.maxHeartRate} bpm", "Peak heart rate", Modifier.weight(1f))
+                            }
                         }
                     }
                 }

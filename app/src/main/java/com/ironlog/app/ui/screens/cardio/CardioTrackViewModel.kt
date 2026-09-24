@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import android.util.Log
 import com.ironlog.app.core.sensors.HealthConnectWriter
+import com.ironlog.app.core.sensors.HeartRateMonitor
 
 data class TrackUiState(
     val type: CardioType = CardioType.RUN,
@@ -38,7 +39,10 @@ data class TrackUiState(
     val discarded: Boolean = false,
     val error: String? = null,
     /** Save failed; the user can retry or throw the session away. */
-    val canDiscard: Boolean = false
+    val canDiscard: Boolean = false,
+    /** Beats per minute from a strap, live. */
+    val heartRate: Int? = null,
+    val heartRateSamples: Int = 0
 )
 
 @HiltViewModel
@@ -49,8 +53,18 @@ class CardioTrackViewModel @Inject constructor(
     private val stepCounter: StepCounter,
     profileRepository: ProfileRepository,
     private val savedStateHandle: SavedStateHandle,
-    private val healthConnect: HealthConnectWriter
+    private val healthConnect: HealthConnectWriter,
+    val heartRateMonitor: HeartRateMonitor
 ) : ViewModel() {
+
+    // Every reading of the session, for the average and the peak at save time.
+    private var hrSum = 0L
+    private var hrCount = 0
+    private var hrMax = 0
+
+    val heartRateState: StateFlow<HeartRateMonitor.State> = heartRateMonitor.state
+    val heartRateDevices: StateFlow<List<HeartRateMonitor.Device>> = heartRateMonitor.found
+
 
     /** Owned by the foreground service, so it survives this screen being closed. */
     val progress: StateFlow<CardioProgress> = CardioTrackingService.progress
@@ -79,6 +93,29 @@ class CardioTrackViewModel @Inject constructor(
             }
             startStepCounting()
         }
+    }
+
+    init {
+        viewModelScope.launch {
+            heartRateMonitor.bpm.collect { bpm ->
+                if (bpm != null && progress.value.isTracking && !progress.value.isPaused) {
+                    hrSum += bpm; hrCount++; if (bpm > hrMax) hrMax = bpm
+                }
+                _state.update { it.copy(heartRate = bpm, heartRateSamples = hrCount) }
+            }
+        }
+    }
+
+    fun scanForStrap() = heartRateMonitor.startScan()
+    fun stopScanning() = heartRateMonitor.stopScan()
+    fun connectStrap(device: HeartRateMonitor.Device) = heartRateMonitor.connect(device)
+    fun disconnectStrap() = heartRateMonitor.disconnect()
+
+    override fun onCleared() {
+        // The strap belongs to the session; a closed screen mid-session keeps it,
+        // a finished one lets it go.
+        if (!progress.value.isTracking) heartRateMonitor.disconnect()
+        super.onCleared()
     }
 
     fun selectType(type: CardioType) {
@@ -134,7 +171,9 @@ class CardioTrackViewModel @Inject constructor(
             ?: (System.currentTimeMillis() - snapshot.elapsedSeconds * 1000L)
         _state.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
-            cardioRepository.save(_state.value.type, startedAt, snapshot, _state.value.steps ?: 0, "")
+            val avgHr = if (hrCount > 0) (hrSum / hrCount).toInt() else null
+            val maxHr = if (hrCount > 0) hrMax else null
+            cardioRepository.save(_state.value.type, startedAt, snapshot, _state.value.steps ?: 0, "", avgHr, maxHr)
                 .onSuccess { id ->
                     CardioTrackingService.reset()
                     val type = _state.value.type
