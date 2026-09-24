@@ -30,6 +30,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
+import com.ironlog.app.core.sensors.HealthConnectWriter
 
 data class ActiveWorkoutInfo(val id: String, val name: String, val startedAt: Long, val completedSets: Int)
 
@@ -67,7 +68,8 @@ class HomeViewModel @Inject constructor(
     private val bodyRepository: BodyRepository,
     private val goalRepository: StrengthGoalRepository,
     private val stepCounter: StepCounter,
-    private val healthConnectSteps: HealthConnectSteps
+    private val healthConnectSteps: HealthConnectSteps,
+    private val healthConnectWriter: HealthConnectWriter
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -217,7 +219,8 @@ class HomeViewModel @Inject constructor(
 
     fun healthConnectAvailability() = healthConnectSteps.availability()
 
-    fun healthConnectPermissions() = healthConnectSteps.permissions
+    /** Read and write together, in one request, so the user is asked once. */
+    fun healthConnectPermissions() = healthConnectSteps.permissions + healthConnectWriter.permissions
 
     /**
      * Listens to the pedometer while the screen is started. Idempotent, so the

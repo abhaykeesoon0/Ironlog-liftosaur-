@@ -16,6 +16,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.ironlog.app.data.entity.UnitSystem
+import com.ironlog.app.data.repository.ProfileRepository
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 data class RoutineEditorUiState(
     val draft: RoutineDraft = RoutineDraft(),
@@ -31,8 +36,14 @@ data class RoutineEditorUiState(
 class RoutineEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val routineRepository: RoutineRepository,
-    private val exerciseRepository: ExerciseRepository
+    private val exerciseRepository: ExerciseRepository,
+    profileRepository: ProfileRepository
 ) : ViewModel() {
+
+    /** Targets are stored in kilograms and stepped in the user's unit, so the editor needs to know which. */
+    val unit: StateFlow<UnitSystem> = profileRepository.observeUser()
+        .map { it?.unitSystem ?: UnitSystem.METRIC }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UnitSystem.METRIC)
 
     private val routineId: String? = savedStateHandle.get<String>("id")?.takeIf { it.isNotBlank() }
 

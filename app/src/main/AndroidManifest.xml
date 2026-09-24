@@ -6,6 +6,8 @@
          DEVICE INTEGRATION 1 - CAMERA (progress photos, avatar)
          ============================================================ -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Logging a set by voice. The phone's recogniser does the listening; this app keeps only the words. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Optional: the scanner and the photos need it, logging a workout does not. -->
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
@@ -41,6 +43,10 @@
         call, so the offline design holds.
     -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <!-- Writing sessions and meals back, so the log shows in the user's health dashboard. -->
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+    <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
+    <uses-permission android:name="android.permission.health.WRITE_NUTRITION" />
 
     <!-- ============================================================
          DEVICE INTEGRATION 5 - FILE STORAGE (photo + CSV/JSON export)
@@ -125,6 +131,18 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Home-screen widget: this week, the streak, today's food. -->
+        <receiver
+            android:name=".core.widget.IronLogWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/ironlog_widget_info" />
+        </receiver>
     </application>
 
     <queries>

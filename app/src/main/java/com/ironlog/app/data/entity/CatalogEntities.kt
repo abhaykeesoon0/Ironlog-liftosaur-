@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 
 /**
  * Credentials never store a plaintext password. [passwordHash] is a PBKDF2
@@ -104,5 +105,9 @@ data class RoutineExerciseEntity(
     val restSeconds: Int = 120,
     /** Exercises sharing a non-null group are performed back to back. */
     val supersetGroup: Int? = null,
-    val notes: String = ""
+    val notes: String = "",
+    /** The weight the routine prescribes; pre-filled into every set when the routine is started. Null: none. */
+    val targetWeightKg: Double? = null,
+    /** How far the target moves when a session earns it (see Progression). Zero: the target never moves. */
+    @ColumnInfo(defaultValue = "0.0") val progressionKg: Double = 0.0
 )

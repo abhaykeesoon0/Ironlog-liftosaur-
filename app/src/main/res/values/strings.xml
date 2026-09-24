@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">IronLog</string>
+    <string name="widget_description">This week\'s sessions, your streak and today\'s food at a glance.</string>
     <string name="channel_rest_timer">Rest timer</string>
     <string name="channel_rest_timer_desc">Counts down your rest between sets</string>
     <string name="channel_reminders">Workout reminders</string>

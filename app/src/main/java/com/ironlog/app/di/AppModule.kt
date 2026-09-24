@@ -77,7 +77,7 @@ object DatabaseModule {
             // No destructive fallback: silently wiping a user's training history
             // on a schema change would be a data-loss bug, not a convenience.
             // Migrations are added explicitly when the schema moves.
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
 
     /**
@@ -158,6 +158,14 @@ object DatabaseModule {
     val MIGRATION_4_5 = object : Migration(4, 5) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `foods` ADD COLUMN `barcode` TEXT")
+        }
+    }
+
+    /** Routine targets for the progression engine: the weight to prescribe and the step to move it by. */
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `routine_exercises` ADD COLUMN `targetWeightKg` REAL")
+            db.execSQL("ALTER TABLE `routine_exercises` ADD COLUMN `progressionKg` REAL NOT NULL DEFAULT 0.0")
         }
     }
 

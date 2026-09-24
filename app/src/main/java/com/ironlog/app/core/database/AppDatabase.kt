@@ -59,7 +59,7 @@ import com.ironlog.app.data.entity.NutritionGoalEntity
         FoodLogEntity::class,
         NutritionGoalEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

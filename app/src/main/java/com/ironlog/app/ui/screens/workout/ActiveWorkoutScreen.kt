@@ -97,6 +97,7 @@ import com.ironlog.app.ui.theme.Slate600
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.ironlog.app.ui.components.UndoSnackbar
+import androidx.compose.material.icons.filled.Mic
 
 @Composable
 fun ActiveWorkoutScreen(
@@ -151,8 +152,15 @@ fun ActiveWorkoutScreen(
 
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
-        viewModel.consumeMessage()
-        snackbar.showSnackbar(text)
+        // Consumed after it has been shown, and only if it is still the current
+        // message: consuming first would null the key and cancel this effect
+        // before the snackbar appeared, and consuming blindly would swallow a
+        // newer message that arrived while this one was up.
+        try {
+            snackbar.showSnackbar(text)
+        } finally {
+            viewModel.consumeMessage(text)
+        }
     }
 
     // Ticks once a second for the elapsed clock; recomposes only this value.
@@ -484,6 +492,7 @@ private fun ExerciseCard(
     val exercise = block.item.exercise
     val category = exercise.category
     val haptic = LocalHapticFeedback.current
+    val microphone = rememberPermissionState(AppPermission.MICROPHONE)
     var menuOpen by remember { mutableStateOf(false) }
 
     IronCard {
@@ -502,6 +511,13 @@ private fun ExerciseCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Caption("Rest ${formatClock(block.item.workoutExercise.restSeconds)}")
+                }
+                if (viewModel.voiceAvailable) {
+                    // Say the set instead of typing it: the microphone is asked
+                    // for the first time it is pressed, with the reason first.
+                    IconButton(onClick = { microphone.runWithPermission { viewModel.listenForSet(block.id) } }) {
+                        Icon(Icons.Default.Mic, contentDescription = "Say a set for ${exercise.name}", tint = ChalkDim)
+                    }
                 }
                 Box {
                     IconButton(onClick = { menuOpen = true }) {

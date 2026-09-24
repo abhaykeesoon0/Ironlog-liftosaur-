@@ -32,6 +32,7 @@ import android.net.Uri
 import com.ironlog.app.data.repository.BackupRepository
 import com.ironlog.app.data.repository.DEFAULT_LOCK_GRACE
 import com.ironlog.app.core.security.wipe
+import com.ironlog.app.core.widget.WidgetSummary
 
 data class SettingsUiState(
     val exporting: ExportKind? = null,
@@ -54,7 +55,8 @@ class SettingsViewModel @Inject constructor(
     private val cloudAssistant: CloudAssistant,
     private val exportRepository: ExportRepository,
     private val backupRepository: BackupRepository,
-    private val biometricGate: BiometricGate
+    private val biometricGate: BiometricGate,
+    private val widgetSummary: WidgetSummary
 ) : ViewModel() {
 
     val user: StateFlow<UserEntity?> = profileRepository.observeUser()
@@ -114,6 +116,13 @@ class SettingsViewModel @Inject constructor(
 
     fun setStepSource(source: StepSource) =
         persist("Could not change the step source") { profileRepository.setStepSource(source) }
+
+    /** Asks the launcher to place the widget; some launchers cannot, and say so. */
+    fun addWidget(context: android.content.Context) {
+        if (!widgetSummary.requestPin(context)) {
+            _state.update { it.copy(message = "This launcher cannot add widgets from an app. Long-press the home screen and choose Widgets.") }
+        }
+    }
 
     fun setLockGrace(seconds: Int) =
         persist("Could not change the lock timing") { profileRepository.setLockGrace(seconds) }

@@ -30,6 +30,8 @@ import java.time.LocalTime
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.ironlog.app.data.entity.RoutineExerciseEntity
+import com.ironlog.app.domain.usecase.Progression
 
 /** What the logger needs to know after a set is ticked off. */
 data class SetCompletion(
@@ -57,8 +59,14 @@ data class WorkoutSummary(
     val sets: Int,
     val reps: Int,
     val records: List<SummaryRecord>,
-    val isSessionVolumeRecord: Boolean
+    val isSessionVolumeRecord: Boolean,
+    /** Routine targets the session moved, up or back. */
+    val progressions: List<SummaryProgression> = emptyList()
 )
+
+data class SummaryProgression(val exerciseName: String, val fromKg: Double, val toKg: Double) {
+    val isAdvance: Boolean get() = toKg > fromKg
+}
 
 /**
  * Record types in order of how much a lifter cares; a set that beats several
@@ -205,7 +213,9 @@ class WorkoutRepositoryImpl @Inject constructor(
                             WorkoutSetEntity(
                                 id = UUID.randomUUID().toString(),
                                 workoutExerciseId = workoutExercise.id,
-                                setNumber = n
+                                setNumber = n,
+                                // The plan's weight, so the lifter loads the bar rather than looks it up.
+                                weightKg = item.routineExercise.targetWeightKg
                             )
                         }
                     )
@@ -445,6 +455,9 @@ class WorkoutRepositoryImpl @Inject constructor(
                 )
             )
             detail.workout.routineId?.let { routineDao.markPerformed(it, now) }
+            val progressed = detail.workout.routineId?.let { routineId ->
+                advanceRoutine(routineId, kept.groupBy { (item, _) -> item.exercise.id }.mapValues { (_, g) -> g.flatMap { it.second } })
+            }.orEmpty()
 
             WorkoutSummary(
                 workoutId = detail.workout.id,
@@ -454,9 +467,37 @@ class WorkoutRepositoryImpl @Inject constructor(
                 sets = TrainingMath.workingSetCount(allSets),
                 reps = TrainingMath.totalReps(allSets),
                 records = summaryRecords,
-                isSessionVolumeRecord = sessionRecord != null && !sessionRecord.isFirstEver
+                isSessionVolumeRecord = sessionRecord != null && !sessionRecord.isFirstEver,
+                progressions = progressed
             )
         }
+    }
+
+    /**
+     * Moves each routine target on by its step when the session earned it, and
+     * back when it clearly did not. Runs inside the finishing transaction, so a
+     * routine is never advanced for a session that failed to save.
+     */
+    private suspend fun advanceRoutine(
+        routineId: String,
+        setsByExercise: Map<String, List<WorkoutSetEntity>>
+    ): List<SummaryProgression> {
+        val routine = routineDao.getRoutine(routineId) ?: return emptyList()
+        val changed = mutableListOf<RoutineExerciseEntity>()
+        val report = mutableListOf<SummaryProgression>()
+        routine.exercises.forEach { item ->
+            val plan = item.routineExercise
+            val from = plan.targetWeightKg ?: return@forEach
+            val sets = setsByExercise[plan.exerciseId] ?: return@forEach
+            val verdict = Progression.next(
+                Progression.Target(from, plan.progressionKg, plan.targetSets, plan.targetRepsLow, plan.targetRepsHigh),
+                sets
+            ) ?: return@forEach
+            changed += plan.copy(targetWeightKg = verdict.toKg)
+            report += SummaryProgression(item.exercise.name, from, verdict.toKg)
+        }
+        if (changed.isNotEmpty()) routineDao.upsertRoutineExercises(changed)
+        return report
     }
 
     override suspend fun discardActive(): Result<Unit> = io {

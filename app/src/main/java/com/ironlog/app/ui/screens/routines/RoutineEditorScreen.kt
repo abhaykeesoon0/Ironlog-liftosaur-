@@ -52,6 +52,10 @@ import com.ironlog.app.ui.theme.Chalk
 import com.ironlog.app.ui.theme.ChalkDim
 import com.ironlog.app.ui.theme.NumericType
 import com.ironlog.app.ui.theme.Space
+import com.ironlog.app.data.entity.UnitSystem
+import com.ironlog.app.domain.usecase.Progression
+import com.ironlog.app.domain.usecase.TrainingMath
+import com.ironlog.app.ui.format.weightValue
 
 @Composable
 fun RoutineEditorScreen(
@@ -62,6 +66,7 @@ fun RoutineEditorScreen(
     viewModel: RoutineEditorViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val unit by viewModel.unit.collectAsStateWithLifecycle()
 
     LaunchedEffect(pickedExerciseIds) {
         val ids = pickedExerciseIds ?: return@LaunchedEffect
@@ -132,6 +137,7 @@ fun RoutineEditorScreen(
             ) { index, item ->
                 ExerciseDraftCard(
                     item = item,
+                    unit = unit,
                     isFirst = index == 0,
                     isLast = index == state.draft.exercises.lastIndex,
                     onChange = { transform -> viewModel.updateExercise(index, transform) },
@@ -155,6 +161,7 @@ fun RoutineEditorScreen(
 @Composable
 private fun ExerciseDraftCard(
     item: RoutineExerciseDraft,
+    unit: UnitSystem,
     isFirst: Boolean,
     isLast: Boolean,
     onChange: ((RoutineExerciseDraft) -> RoutineExerciseDraft) -> Unit,
@@ -218,6 +225,36 @@ private fun ExerciseDraftCard(
                 onDecrement = { onChange { it.copy(restSeconds = (it.restSeconds - 15).coerceAtLeast(0)) } },
                 onIncrement = { onChange { it.copy(restSeconds = (it.restSeconds + 15).coerceAtMost(900)) } }
             )
+            Hairline(Modifier.padding(vertical = Space.sm))
+            // Progression is opt-in per movement. Steps are whole plates in
+            // the user's unit; the kilogram value underneath is what is stored.
+            val weightStep = if (unit == UnitSystem.METRIC) 2.5 else TrainingMath.lbToKg(5.0)
+            val progressStep = if (unit == UnitSystem.METRIC) 1.25 else TrainingMath.lbToKg(2.5)
+            Stepper(
+                label = "Target weight",
+                value = item.targetWeightKg?.let { "${unit.weightValue(it)} ${unit.weightSuffix}" } ?: "\u2014",
+                onDecrement = {
+                    onChange {
+                        val next = it.targetWeightKg?.minus(weightStep)?.takeIf { w -> w > 0.0 }
+                        it.copy(targetWeightKg = next?.let(Progression::roundKg))
+                    }
+                },
+                onIncrement = {
+                    onChange { it.copy(targetWeightKg = Progression.roundKg(((it.targetWeightKg ?: 0.0) + weightStep).coerceAtMost(1000.0))) }
+                }
+            )
+            Stepper(
+                label = "Step per session",
+                value = if (item.progressionKg <= 0.0) "Off" else "+${unit.weightValue(item.progressionKg)} ${unit.weightSuffix}",
+                onDecrement = { onChange { it.copy(progressionKg = Progression.roundKg((it.progressionKg - progressStep).coerceAtLeast(0.0))) } },
+                onIncrement = { onChange { it.copy(progressionKg = Progression.roundKg((it.progressionKg + progressStep).coerceAtMost(20.0))) } }
+            )
+            if (item.progressionKg > 0.0 && item.targetWeightKg != null) {
+                Caption(
+                    "Every set at ${item.targetRepsHigh} reps moves the target up next time; " +
+                    "a session under ${item.targetRepsLow} moves it back."
+                )
+            }
         }
     }
 }

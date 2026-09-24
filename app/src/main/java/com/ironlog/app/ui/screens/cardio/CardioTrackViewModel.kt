@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.util.Log
+import com.ironlog.app.core.sensors.HealthConnectWriter
 
 data class TrackUiState(
     val type: CardioType = CardioType.RUN,
@@ -46,7 +48,8 @@ class CardioTrackViewModel @Inject constructor(
     private val locationTracker: LocationTracker,
     private val stepCounter: StepCounter,
     profileRepository: ProfileRepository,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
+    private val healthConnect: HealthConnectWriter
 ) : ViewModel() {
 
     /** Owned by the foreground service, so it survives this screen being closed. */
@@ -134,6 +137,11 @@ class CardioTrackViewModel @Inject constructor(
             cardioRepository.save(_state.value.type, startedAt, snapshot, _state.value.steps ?: 0, "")
                 .onSuccess { id ->
                     CardioTrackingService.reset()
+                    val type = _state.value.type
+                    viewModelScope.launch {
+                        val outcome = healthConnect.writeCardio(type, startedAt, System.currentTimeMillis(), snapshot.distanceMeters)
+                        if (outcome is HealthConnectWriter.Outcome.Failed) Log.w("IronLog", "Health Connect: ${outcome.message}")
+                    }
                     _state.update { it.copy(isSaving = false, savedId = id) }
                 }
                 .onFailure { e ->
