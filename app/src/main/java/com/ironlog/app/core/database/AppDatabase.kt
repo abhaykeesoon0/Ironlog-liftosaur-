@@ -59,7 +59,7 @@ import com.ironlog.app.data.entity.NutritionGoalEntity
         FoodLogEntity::class,
         NutritionGoalEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -79,6 +79,6 @@ abstract class AppDatabase : RoomDatabase() {
         const val NAME = "ironlog.db"
 
         /** Kept beside the annotation; the migration test walks from 1 to here. */
-        const val VERSION = 6
+        const val VERSION = 7
     }
 }

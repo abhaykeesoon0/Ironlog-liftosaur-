@@ -31,7 +31,9 @@ interface CardioRepository {
         startedAt: Long,
         progress: CardioProgress,
         steps: Int,
-        note: String
+        note: String,
+        avgHeartRate: Int? = null,
+        maxHeartRate: Int? = null
     ): Result<String>
     suspend fun delete(id: String): Result<Unit>
 
@@ -65,7 +67,9 @@ class CardioRepositoryImpl @Inject constructor(
         startedAt: Long,
         progress: CardioProgress,
         steps: Int,
-        note: String
+        note: String,
+        avgHeartRate: Int?,
+        maxHeartRate: Int?
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val userId = currentUser.require()
@@ -88,7 +92,9 @@ class CardioRepositoryImpl @Inject constructor(
                 ),
                 steps = steps.coerceAtLeast(0),
                 routeJson = json.encodeToString(routeSerializer, progress.points),
-                note = Validators.sanitiseText(note, 300)
+                note = Validators.sanitiseText(note, 300),
+                avgHeartRate = avgHeartRate?.takeIf { it in 20..250 },
+                maxHeartRate = maxHeartRate?.takeIf { it in 20..250 }
             )
             cardioDao.upsertSession(session)
             session.id

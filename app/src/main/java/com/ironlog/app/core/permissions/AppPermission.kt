@@ -58,6 +58,17 @@ enum class AppPermission(
             "and a rep count. The phone's own recogniser does the listening; Liftosaur keeps only the words.",
         deniedConsequence = "Without microphone access you can still type every set; you just can't say it."
     ),
+    BLUETOOTH_SCAN(
+        title = "Nearby devices",
+        rationale = "To find a heart-rate strap, Liftosaur scans for nearby Bluetooth devices that advertise " +
+            "the standard heart-rate service. Nothing about them is stored except the one you connect.",
+        deniedConsequence = "Without it, a strap cannot be found. Cardio still records distance, pace and steps."
+    ),
+    BLUETOOTH_CONNECT(
+        title = "Connect to the strap",
+        rationale = "Connecting reads beats per minute from the strap you chose, for this session only.",
+        deniedConsequence = "Without it, the strap cannot be read. Cardio still records everything else."
+    ),
     READ_IMAGES(
         title = "Photos",
         rationale = "Read access lets you choose an existing photo from your gallery as a progress shot or avatar, " +
@@ -80,6 +91,11 @@ enum class AppPermission(
             ACTIVITY_RECOGNITION ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
                     Manifest.permission.ACTIVITY_RECOGNITION else null
+            BLUETOOTH_SCAN ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_SCAN
+                else Manifest.permission.ACCESS_FINE_LOCATION
+            BLUETOOTH_CONNECT ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_CONNECT else null
             READ_IMAGES ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
                     Manifest.permission.READ_MEDIA_IMAGES

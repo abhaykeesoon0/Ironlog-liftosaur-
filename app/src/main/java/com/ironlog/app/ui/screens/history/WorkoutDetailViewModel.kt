@@ -29,6 +29,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import com.ironlog.app.core.media.DataExporter
+import com.ironlog.app.core.media.WorkoutCardRenderer
+import com.ironlog.app.data.repository.UserFacingException
 
 data class WorkoutDetailUiState(
     val isLoading: Boolean = true,
@@ -59,7 +62,8 @@ class WorkoutDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val workoutRepository: WorkoutRepository,
     private val routineRepository: RoutineRepository,
-    profileRepository: ProfileRepository
+    profileRepository: ProfileRepository,
+    private val exporter: DataExporter
 ) : ViewModel() {
 
     private val workoutId: String = checkNotNull(savedStateHandle.get<String>("id"))
@@ -184,6 +188,40 @@ class WorkoutDetailViewModel @Inject constructor(
             append("Logged with Liftosaur")
         }
     }
+
+    /**
+     * The same summary as a picture, ready for the share sheet. Written to
+     * the app's exports folder and handed over with a temporary grant, the
+     * way the CSV export is.
+     */
+    suspend fun shareImage(): Result<android.content.Intent> {
+        val s = _state.value
+        val detail = s.detail ?: return Result.failure(UserFacingException("Nothing to share yet"))
+        val w = detail.workout
+        val lines = detail.exercises.sortedBy { it.workoutExercise.orderIndex }.flatMap { ex ->
+            listOf(ex.exercise.name) + ex.sets.sortedBy { it.setNumber }.map { set ->
+                val load = set.weightKg?.let { s.unit.formatWeight(it) }
+                val reps = set.reps?.let { "$it reps" }
+                "  ${set.setNumber}. ${listOfNotNull(load, reps).joinToString(" \u00d7 ")}"
+            }
+        }
+        val card = WorkoutCardRenderer.Card(
+            title = w.name,
+            subtitle = formatFullDate(w.startedAt),
+            stats = listOf(
+                formatDuration(w.durationSeconds) to "Duration",
+                s.unit.formatVolume(w.totalVolumeKg) to "Volume",
+                w.totalSets.toString() to "Sets",
+                w.prCount.toString() to "PRs"
+            ),
+            lines = lines
+        )
+        return runCatching { WorkoutCardRenderer.render(card) }
+            .mapCatching { bytes -> exporter.exportBinary(bytes, "png").getOrThrow() }
+            .map { file -> exporter.share(file, "image/png") }
+    }
+
+    fun showError(message: String) = _state.update { it.copy(error = message) }
 
     fun dismissError() = _state.update { it.copy(error = null) }
 }

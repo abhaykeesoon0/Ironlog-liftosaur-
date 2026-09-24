@@ -66,6 +66,13 @@ import com.ironlog.app.ui.theme.ChalkFaint
 import com.ironlog.app.ui.theme.NumericType
 import com.ironlog.app.ui.theme.PrGold
 import com.ironlog.app.ui.theme.Space
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.rememberCoroutineScope
+import com.ironlog.app.data.repository.userMessage
+import com.ironlog.app.ui.theme.Slate800
+import kotlinx.coroutines.launch
 
 @Composable
 fun WorkoutDetailScreen(
@@ -87,16 +94,38 @@ fun WorkoutDetailScreen(
             onBack = onBack,
             actions = {
                 if (state.detail != null) {
-                    IconButton(onClick = {
-                        viewModel.shareText()?.let { text ->
-                            val send = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, text)
-                            }
-                            context.startActivity(Intent.createChooser(send, "Share workout"))
+                    var shareOpen by remember { mutableStateOf(false) }
+                    val scope = rememberCoroutineScope()
+                    Box {
+                        IconButton(onClick = { shareOpen = true }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share workout", tint = Chalk)
                         }
-                    }) {
-                        Icon(Icons.Default.Share, contentDescription = "Share workout", tint = Chalk)
+                        DropdownMenu(expanded = shareOpen, onDismissRequest = { shareOpen = false }, containerColor = Slate800) {
+                            DropdownMenuItem(
+                                text = { Text("Share as text", color = Chalk) },
+                                onClick = {
+                                    shareOpen = false
+                                    viewModel.shareText()?.let { text ->
+                                        val send = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, text)
+                                        }
+                                        context.startActivity(Intent.createChooser(send, "Share workout"))
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share as image", color = Chalk) },
+                                onClick = {
+                                    shareOpen = false
+                                    scope.launch {
+                                        viewModel.shareImage()
+                                            .onSuccess { context.startActivity(it) }
+                                            .onFailure { viewModel.showError(it.userMessage("Couldn't make the image")) }
+                                    }
+                                }
+                            )
+                        }
                     }
                     IconButton(onClick = { confirmDelete = true }, enabled = !state.isDeleting) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete workout", tint = Chalk)

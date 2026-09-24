@@ -68,6 +68,13 @@ import com.ironlog.app.ui.theme.Plate15
 import com.ironlog.app.ui.theme.Radius
 import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.theme.Space
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.ui.semantics.contentDescription
+import com.ironlog.app.core.sensors.HeartRateMonitor
+import com.ironlog.app.ui.theme.Plate25
 
 private enum class Phase { SETUP, LIVE, STOPPED }
 
@@ -123,6 +130,20 @@ fun CardioTrackScreen(
 
     BackHandler(enabled = phase == Phase.LIVE) { confirmLeave = true }
 
+    val hrState by viewModel.heartRateState.collectAsStateWithLifecycle()
+    val hrDevices by viewModel.heartRateDevices.collectAsStateWithLifecycle()
+    val bluetoothScan = rememberPermissionState(AppPermission.BLUETOOTH_SCAN)
+    val bluetoothConnect = rememberPermissionState(AppPermission.BLUETOOTH_CONNECT)
+    var pickingStrap by remember { mutableStateOf(false) }
+    if (pickingStrap) {
+        StrapPicker(
+            devices = hrDevices,
+            scanning = hrState is HeartRateMonitor.State.Scanning,
+            onPick = { device -> pickingStrap = false; viewModel.connectStrap(device) },
+            onDismiss = { pickingStrap = false; viewModel.stopScanning() }
+        )
+    }
+
     Column(Modifier.fillMaxSize()) {
         IronTopBar(title = "Outdoor cardio", onBack = ::leave)
 
@@ -161,6 +182,19 @@ fun CardioTrackScreen(
                     }
                     Spacer(Modifier.height(Space.lg))
 
+                    if (viewModel.heartRateMonitor.isAvailable()) {
+                        HeartRateRow(
+                            bpm = state.heartRate,
+                            hrState = hrState,
+                            onConnect = {
+                                bluetoothScan.runWithPermission {
+                                    bluetoothConnect.runWithPermission { pickingStrap = true; viewModel.scanForStrap() }
+                                }
+                            },
+                            onDisconnect = viewModel::disconnectStrap
+                        )
+                        Spacer(Modifier.height(Space.md))
+                    }
                     StepsRow(
                         steps = state.steps,
                         available = viewModel.canCountSteps,
@@ -304,4 +338,85 @@ private fun StepsRow(steps: Int?, available: Boolean, granted: Boolean, enabled:
             TextButton(onClick = onEnable) { Text("Count steps", color = Chalk) }
         }
     }
+}
+
+/** Live beats per minute from a strap, or the button that finds one. */
+@Composable
+private fun HeartRateRow(
+    bpm: Int?,
+    hrState: HeartRateMonitor.State,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit
+) {
+    IronCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Favorite, contentDescription = null, tint = if (bpm != null) Plate25 else ChalkDim)
+            Spacer(Modifier.width(Space.md))
+            Column(Modifier.weight(1f)) {
+                when (hrState) {
+                    is HeartRateMonitor.State.Connected -> {
+                        Text(
+                            bpm?.let { "$it bpm" } ?: "\u2014",
+                            style = NumericType.stat,
+                            color = Chalk,
+                            modifier = Modifier.semantics { contentDescription = bpm?.let { "$it beats per minute" } ?: "No reading yet" }
+                        )
+                        Caption(hrState.device.name)
+                    }
+                    is HeartRateMonitor.State.Connecting -> {
+                        Text("Connecting", style = MaterialTheme.typography.bodyLarge, color = Chalk)
+                        Caption(hrState.device.name)
+                    }
+                    is HeartRateMonitor.State.Failed -> {
+                        Text("Heart rate", style = MaterialTheme.typography.bodyLarge, color = Chalk)
+                        Caption(hrState.message)
+                    }
+                    else -> {
+                        Text("Heart rate", style = MaterialTheme.typography.bodyLarge, color = Chalk)
+                        Caption("Connect a Bluetooth strap or watch that shares its heart rate")
+                    }
+                }
+            }
+            when (hrState) {
+                is HeartRateMonitor.State.Connected, is HeartRateMonitor.State.Connecting ->
+                    TextButton(onClick = onDisconnect) { Text("Disconnect", color = ChalkDim) }
+                else -> TextButton(onClick = onConnect) { Text("Connect", color = Chalk) }
+            }
+        }
+    }
+}
+
+/** The straps found so far; the list fills as the scan runs. */
+@Composable
+private fun StrapPicker(
+    devices: List<HeartRateMonitor.Device>,
+    scanning: Boolean,
+    onPick: (HeartRateMonitor.Device) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Slate800,
+        title = { Text("Heart-rate sensors", color = Chalk) },
+        text = {
+            Column {
+                if (devices.isEmpty()) {
+                    Caption(if (scanning) "Looking for straps nearby\u2026 make sure it is on and worn." else "Nothing found yet.")
+                }
+                devices.forEach { device ->
+                    Text(
+                        device.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Chalk,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClickLabel = "Connect to ${device.name}") { onPick(device) }
+                            .padding(vertical = Space.sm)
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = ChalkDim) } }
+    )
 }
