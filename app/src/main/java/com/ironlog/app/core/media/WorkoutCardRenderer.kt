@@ -74,7 +74,11 @@ object WorkoutCardRenderer {
             val x = MARGIN + slot * i + 36f
             paint.color = chalk
             paint.typeface = Typeface.DEFAULT_BOLD
+            // A big volume like "12,480 kg" is wider than its slot at the full
+            // size; it shrinks to fit rather than running into the next stat.
             paint.textSize = 60f
+            val room = slot - 48f
+            while (paint.measureText(value) > room && paint.textSize > 30f) paint.textSize -= 2f
             canvas.drawText(value, x, statsTop + 92f, paint)
             paint.color = dim
             paint.typeface = Typeface.DEFAULT

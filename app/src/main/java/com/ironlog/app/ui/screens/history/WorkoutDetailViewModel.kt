@@ -219,7 +219,7 @@ class WorkoutDetailViewModel @Inject constructor(
             lines = lines
         )
         return runCatching { WorkoutCardRenderer.render(card) }
-            .mapCatching { bytes -> exporter.exportBinary(bytes, "png").getOrThrow() }
+            .mapCatching { bytes -> exporter.exportBinary(bytes, "png", kind = "workout").getOrThrow() }
             .map { file -> exporter.share(file, "image/png") }
     }
 

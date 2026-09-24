@@ -32,6 +32,8 @@ import com.ironlog.app.ui.theme.Slate600
 import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Slate800
 import kotlin.math.hypot
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 
 /**
  * The body drawn at the level a lifter talks about it -- upper and lower
@@ -60,6 +62,9 @@ fun MusclePartMap(
     } else {
         "Muscle map. Trained: " + worked.joinToString { it.label } + ". Press a muscle for its sets."
     }
+    // A screen reader cannot press a painted region, so every worked part is
+    // also offered as a named action on the map.
+    val actions = worked.map { part -> CustomAccessibilityAction("Open ${part.label}") { onPartClick(part); true } }
     fun shade(part: MusclePart): Color {
         val f = intensity[part] ?: 0f
         return if (f <= 0f) IDLE else lerp(lerp(tint, Color.White, 0.45f), lerp(tint, Color.Black, 0.35f), f)
@@ -70,7 +75,7 @@ fun MusclePartMap(
             Modifier
                 .fillMaxWidth()
                 .height(height)
-                .semantics { contentDescription = description },
+                .semantics { contentDescription = description; customActions = actions },
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             PartFigure(FRONT_PARTS, "Front", selected, ::shade, onPartClick, Modifier.weight(1f))

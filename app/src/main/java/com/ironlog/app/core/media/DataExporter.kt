@@ -169,10 +169,10 @@ class DataExporter @Inject constructor(
         }
     }
 
-    /** Writes an already-sealed backup. The extension names the format, not the content. */
-    suspend fun exportBinary(bytes: ByteArray, extension: String): Result<File> = withContext(Dispatchers.IO) {
+    /** Writes bytes ready to share -- a sealed backup, a rendered card. The extension names the format. */
+    suspend fun exportBinary(bytes: ByteArray, extension: String, kind: String = "backup"): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
-            val file = File(exportsDir, "liftosaur_backup_${stamp()}.$extension")
+            val file = File(exportsDir, "liftosaur_${kind}_${stamp()}.$extension")
             file.writeBytes(bytes)
             file
         }
