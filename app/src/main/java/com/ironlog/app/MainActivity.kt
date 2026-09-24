@@ -242,7 +242,7 @@ private fun BiometricLockScreen(
             modifier = Modifier.height(40.dp)
         )
         Spacer(Modifier.height(Space.lg))
-        Text("IronLog is locked", style = MaterialTheme.typography.headlineMedium, color = Chalk)
+        Text("Liftosaur is locked", style = MaterialTheme.typography.headlineMedium, color = Chalk)
         Spacer(Modifier.height(Space.sm))
         Text(
             "Unlock to reach your training log.",

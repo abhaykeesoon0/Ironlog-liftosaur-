@@ -181,7 +181,7 @@ class WorkoutDetailViewModel @Inject constructor(
                     appendLine("  ${set.setNumber}. ${listOfNotNull(load, reps).joinToString(" × ")}")
                 }
             }
-            append("Logged with IronLog")
+            append("Logged with Liftosaur")
         }
     }
 

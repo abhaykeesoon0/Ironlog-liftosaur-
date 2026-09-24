@@ -50,7 +50,7 @@ class BiometricGate @Inject constructor(
 
     fun prompt(
         activity: FragmentActivity,
-        title: String = "Unlock IronLog",
+        title: String = "Unlock Liftosaur",
         subtitle: String = "Your training log is locked",
         onSuccess: () -> Unit,
         onFailure: (String) -> Unit,

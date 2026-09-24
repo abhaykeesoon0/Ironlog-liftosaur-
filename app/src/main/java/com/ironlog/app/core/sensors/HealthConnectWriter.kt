@@ -93,7 +93,7 @@ class HealthConnectWriter @Inject constructor(
                         CardioType.CYCLE -> ExerciseSessionRecord.EXERCISE_TYPE_BIKING
                         CardioType.HIKE -> ExerciseSessionRecord.EXERCISE_TYPE_HIKING
                     },
-                    title = "${type.label} with IronLog",
+                    title = "${type.label} with Liftosaur",
                     metadata = Metadata()
                 )
             )

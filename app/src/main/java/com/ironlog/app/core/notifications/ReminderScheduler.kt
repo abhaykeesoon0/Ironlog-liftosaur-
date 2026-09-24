@@ -84,7 +84,7 @@ class ReminderWorker(
         if (!trainedToday) {
             entry.notificationHelper().workoutReminder(
                 title = "Time to train",
-                body = "Nothing logged yet today. Open IronLog to start a routine."
+                body = "Nothing logged yet today. Open Liftosaur to start a routine."
             )
         }
         return Result.success()

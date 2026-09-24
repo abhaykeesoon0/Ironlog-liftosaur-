@@ -317,7 +317,7 @@ private fun AuthScaffold(
     ) {
         Spacer(Modifier.height(72.dp))
         Text(
-            text = "IRONLOG",
+            text = "LIFTOSAUR",
             style = MaterialTheme.typography.labelMedium,
             color = ChalkDim
         )
