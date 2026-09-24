@@ -63,6 +63,7 @@ import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.screens.nutrition.NutritionScreen
 import com.ironlog.app.ui.screens.nutrition.PlanScreen
 import com.ironlog.app.ui.screens.onboarding.OnboardingScreen
+import com.ironlog.app.ui.screens.home.CustomiseHomeScreen
 
 object Routes {
     const val SIGN_IN = "auth/sign-in"
@@ -93,6 +94,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val NUTRITION = "nutrition"
     const val ONBOARDING = "onboarding"
+    const val CUSTOMISE_HOME = "home/customise"
     const val NUTRITION_PLAN = "nutrition/plan"
     const val CHANGE_PASSWORD = "settings/password"
 
@@ -203,7 +205,8 @@ fun MainNavHost(
                     onOpenGoals = { navController.navigate(Routes.STRENGTH_GOALS) },
                     onOpenQuests = { navController.navigate(Routes.QUESTS) },
                     onOpenCoach = { navController.navigate(Routes.COACH) },
-                    onOpenNutrition = { navController.navigate(Routes.NUTRITION) }
+                    onOpenNutrition = { navController.navigate(Routes.NUTRITION) },
+                    onCustomise = { navController.navigate(Routes.CUSTOMISE_HOME) }
                 )
             }
             composable(Routes.ROUTINES) {
@@ -367,6 +370,9 @@ fun MainNavHost(
             }
             composable(Routes.ONBOARDING) {
                 OnboardingScreen(onDone = { navController.popBackStack() })
+            }
+            composable(Routes.CUSTOMISE_HOME) {
+                CustomiseHomeScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.CHANGE_PASSWORD) {
                 ChangePasswordScreen(onBack = { navController.popBackStack() })

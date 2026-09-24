@@ -73,45 +73,38 @@ object Coach {
             )
         }
 
-        return when {
-            q.matches("today", "what should i train", "what do i train", "next session") ->
-                trainToday(context)
-
-            q.matches("recover", "sore", "rest day", "how often", "frequency", "how many days") ->
-                recovery(context)
-
-            q.matches("stronger", "strength", "progress", "add weight", "progression", "plateau", "stuck", "stopped") ->
-                progression(context)
-
-            q.matches("protein", "diet", "eat", "nutrition", "calorie", "bulk", "cut") ->
-                nutrition(context)
-
-            q.matches("rest between", "rest time", "how long between", "rest period") ->
-                restTimes()
-
-            q.matches("reps", "sets", "how many reps", "rep range", "volume") ->
-                setsAndReps()
-
-            q.matches("warm up", "warmup", "warm-up") ->
-                warmUp()
-
-            q.matches("sleep", "tired", "fatigue", "overtraining") ->
-                sleep()
-
-            q.matches("cardio", "running", "steps", "conditioning") ->
-                cardio()
-
-            q.matches("how am i", "doing", "progressing", "summary", "my week") ->
-                weekSummary(context)
-
-            q.matches("weight", "bodyweight", "heavier", "lighter", "lose", "gain") ->
-                bodyweight(context)
-
-            else -> fallback(context)
-        }
+        // Each topic is scored by how many of its phrases the question contains,
+        // matched on whole words: "creatine" must not become a diet answer
+        // because it happens to contain "eat". Nothing matching is an honest
+        // "I don't know", which is what lets the web lookup take over.
+        val scored = TOPICS.map { topic -> topic to score(q, topic.needles) }
+        val best = scored.filter { it.second > 0 }.maxByOrNull { it.second }
+        return best?.first?.answer?.invoke(context) ?: fallback(context)
     }
 
-    private fun String.matches(vararg needles: String) = needles.any { contains(it) }
+    private class Topic(val needles: List<String>, val answer: (Context) -> Answer)
+
+    private fun topic(vararg needles: String, answer: (Context) -> Answer) = Topic(needles.toList(), answer)
+
+    private val TOPICS = listOf(
+        topic("today", "what should i train", "what do i train", "next session") { trainToday(it) },
+        topic("recover", "recovery", "sore", "rest day", "rest days", "how often", "frequency", "how many days") { recovery(it) },
+        topic("stronger", "strength", "progress", "add weight", "progression", "plateau", "stuck", "stopped") { progression(it) },
+        topic("protein", "diet", "eat", "eating", "nutrition", "calorie", "calories", "bulk", "cut") { nutrition(it) },
+        topic("rest between", "rest time", "how long between", "rest period", "between sets") { restTimes() },
+        topic("reps", "sets", "how many reps", "rep range", "volume") { setsAndReps() },
+        topic("warm up", "warmup", "warm-up") { warmUp() },
+        topic("sleep", "tired", "fatigue", "overtraining") { sleep() },
+        topic("cardio", "running", "steps", "conditioning") { cardio() },
+        topic("how am i", "doing", "progressing", "summary", "my week") { weekSummary(it) },
+        topic("weight", "bodyweight", "heavier", "lighter", "lose", "gain") { bodyweight(it) }
+    )
+
+    /** Whole-word hits, a multi-word phrase counting double because it is the more specific claim. */
+    private fun score(question: String, needles: List<String>): Int = needles.sumOf { needle ->
+        val pattern = Regex("(?<![a-z])" + Regex.escape(needle) + "(?![a-z])")
+        if (pattern.containsMatchIn(question)) (if (' ' in needle) 2 else 1) else 0
+    }
 
     private val MEDICAL = listOf(
         "pain", "hurts", "hurting", "injur", "sprain", "strain my", "tear", "torn",
