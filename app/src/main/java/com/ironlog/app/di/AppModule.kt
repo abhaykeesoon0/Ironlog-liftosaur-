@@ -57,6 +57,9 @@ import com.ironlog.app.data.repository.NutritionRepository
 import com.ironlog.app.data.repository.NutritionRepositoryImpl
 import com.ironlog.app.data.repository.BackupRepository
 import com.ironlog.app.data.repository.BackupRepositoryImpl
+import com.ironlog.app.core.security.DatabaseEncryption
+import com.ironlog.app.core.security.SecureTokenStore
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -72,13 +75,20 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
+    fun provideDatabase(@ApplicationContext context: Context, tokenStore: SecureTokenStore): AppDatabase {
+        // Encrypted at rest. The library loads once; an install from before
+        // encryption is converted in place before Room opens the file.
+        System.loadLibrary("sqlcipher")
+        val passphrase = DatabaseEncryption.passphrase(tokenStore)
+        DatabaseEncryption.ensureEncrypted(context, AppDatabase.NAME, passphrase)
+        return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
+            .openHelperFactory(SupportOpenHelperFactory(passphrase))
             // No destructive fallback: silently wiping a user's training history
             // on a schema change would be a data-loss bug, not a convenience.
             // Migrations are added explicitly when the schema moves.
             .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
+    }
 
     /**
      * Adds the strength_goals table. Purely additive, so no existing row is

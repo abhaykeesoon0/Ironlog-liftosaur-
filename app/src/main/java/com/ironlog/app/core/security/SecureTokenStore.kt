@@ -84,6 +84,13 @@ class SecureTokenStore @Inject constructor(
         }.apply()
     }
 
+    /** The SQLCipher passphrase for this device's database, made once; see DatabaseEncryption. */
+    fun databaseKey(): String? = prefs.getString(KEY_DATABASE, null)
+
+    fun saveDatabaseKey(value: String) {
+        prefs.edit().putString(KEY_DATABASE, value).apply()
+    }
+
     /** Failures and the lock deadline for one account, keyed by a hash of the email. */
     fun loginThrottle(key: String): Pair<Int, Long> =
         prefs.getInt("throttle_f_$key", 0) to prefs.getLong("throttle_u_$key", 0L)
@@ -104,6 +111,7 @@ class SecureTokenStore @Inject constructor(
     private companion object {
         const val FILE_NAME = "ironlog_session"
         const val KEY_USER_ID = "user_id"
+        const val KEY_DATABASE = "database_key"
         const val KEY_ACCESS = "access_token"
         const val KEY_REFRESH = "refresh_token"
         const val KEY_ACCESS_EXPIRY = "access_expiry"

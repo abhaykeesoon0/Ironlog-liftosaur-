@@ -81,6 +81,8 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.security.crypto)
+    // Database encryption at rest. Native library, no network.
+    implementation(libs.sqlcipher.android)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.health.connect)
     implementation(libs.mlkit.genai.prompt)
