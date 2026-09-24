@@ -79,6 +79,10 @@ interface ProfileRepository {
      */
     val welcomeSoundEnabled: Flow<Boolean>
 
+    /** Whether the coach may look a topic up on the open web. Off by default: the app is offline by design. */
+    val webLookupsEnabled: Flow<Boolean>
+    suspend fun setWebLookups(enabled: Boolean): Result<Unit>
+
     /** Which plates and bar the gym has, used by the plate calculator. */
     val equipment: Flow<EquipmentSettings>
 
@@ -136,6 +140,13 @@ class ProfileRepositoryImpl @Inject constructor(
 
     override val welcomeSoundEnabled: Flow<Boolean> =
         dataStore.data.map { prefs -> prefs[KEY_WELCOME_SOUND] ?: true }
+
+    override val webLookupsEnabled: Flow<Boolean> =
+        dataStore.data.map { prefs -> prefs[KEY_WEB_LOOKUPS] ?: false }
+
+    override suspend fun setWebLookups(enabled: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching { dataStore.edit { prefs -> prefs[KEY_WEB_LOOKUPS] = enabled }; Unit }
+    }
 
     override val equipment: Flow<EquipmentSettings> = dataStore.data.map { prefs ->
         val set = prefs[KEY_PLATE_SET]
@@ -330,6 +341,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_REMINDER_HOUR = intPreferencesKey("reminder_hour")
         val KEY_REMINDER_MINUTE = intPreferencesKey("reminder_minute")
         val KEY_WELCOME_SOUND = booleanPreferencesKey("welcome_sound_enabled")
+        val KEY_WEB_LOOKUPS = booleanPreferencesKey("coach_web_lookups")
         val KEY_PLATE_SET = stringPreferencesKey("plate_set")
         val KEY_STEP_SOURCE = stringPreferencesKey("step_source")
         val KEY_MUSCLE_TINT = stringPreferencesKey("muscle_tint")

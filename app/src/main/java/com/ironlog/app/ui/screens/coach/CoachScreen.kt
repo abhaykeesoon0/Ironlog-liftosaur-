@@ -48,6 +48,8 @@ import com.ironlog.app.ui.theme.Slate700
 import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.theme.Space
 import com.ironlog.app.ui.theme.Warning
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalUriHandler
 
 /**
  * The coach.
@@ -108,13 +110,20 @@ fun CoachScreen(
             }
         }
 
-        if (state.cloudAvailable) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = Space.lg),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        // What the coach may reach for. Web lookups are keyless and send only
+        // the topic; the cloud sends the question with the user's figures.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = Space.lg),
+            horizontalArrangement = Arrangement.spacedBy(Space.xs),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IronChip(
+                text = if (state.webLookups) "Looking things up online" else "Offline only",
+                selected = state.webLookups
+            ) { viewModel.setWebLookups(!state.webLookups) }
+            if (state.cloudAvailable) {
                 IronChip(
-                    text = if (state.useCloud) "Asking Claude" else "Asking the built-in coach",
+                    text = if (state.useCloud) "Asking Claude" else "Built-in coach",
                     selected = state.useCloud
                 ) { viewModel.setUseCloud(!state.useCloud) }
             }
@@ -168,6 +177,17 @@ private fun Bubble(message: CoachMessage) {
                 // A referral is the one answer that should not blend in.
                 color = if (message.isReferral) Warning else Chalk
             )
+            message.url?.takeIf { it.isNotBlank() }?.let { url ->
+                val uriHandler = LocalUriHandler.current
+                Text(
+                    "Read the source",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Chalk,
+                    modifier = Modifier
+                        .padding(top = Space.xs)
+                        .clickable(onClickLabel = "Open $url") { uriHandler.openUri(url) }
+                )
+            }
             message.source?.let {
                 Spacer(Modifier.height(Space.xs))
                 Caption("Source: $it")
