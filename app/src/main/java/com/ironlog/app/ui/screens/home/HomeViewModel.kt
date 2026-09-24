@@ -31,6 +31,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
 import com.ironlog.app.core.sensors.HealthConnectWriter
+import com.ironlog.app.data.entity.MuscleGroup
+import com.ironlog.app.data.entity.MuscleTint
+import com.ironlog.app.domain.usecase.MuscleParts
 
 data class ActiveWorkoutInfo(val id: String, val name: String, val startedAt: Long, val completedSets: Int)
 
@@ -57,6 +60,9 @@ data class HomeUiState(
     val recovery: List<Recovery.MuscleState> = emptyList(),
     val equipment: EquipmentSettings = EquipmentSettings(),
     val recentRecords: List<RecordWithExercise> = emptyList(),
+    /** The last four weeks of work by muscle part, newest first, for the muscle map. */
+    val muscleWeeks: List<MuscleParts.Week> = emptyList(),
+    val muscleTint: MuscleTint = MuscleTint.PLUM,
     val error: String? = null
 )
 
@@ -176,6 +182,26 @@ class HomeViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            val since = System.currentTimeMillis() - MUSCLE_MAP_WINDOW_MS
+            combine(workoutRepository.observeExerciseWork(since), profileRepository.muscleTint) { rows, tint -> rows to tint }
+                .catch { e -> _state.update { it.copy(error = e.userMessage("Could not map your muscles")) } }
+                .collect { (rows, tint) ->
+                    val work = rows.map { row ->
+                        MuscleParts.Work(
+                            exerciseName = row.exerciseName,
+                            primary = row.primaryMuscle,
+                            secondary = row.secondaryMuscles.split(',')
+                                .mapNotNull { name -> runCatching { MuscleGroup.valueOf(name.trim()) }.getOrNull() },
+                            startedAt = row.startedAt,
+                            sets = row.sets,
+                            volumeKg = row.volume
+                        )
+                    }
+                    _state.update { it.copy(muscleWeeks = MuscleParts.weekly(work), muscleTint = tint) }
+                }
+        }
+
+        viewModelScope.launch {
             goalRepository.observeMuscleSessions()
                 .catch { e -> _state.update { it.copy(error = e.userMessage("Could not work out your recovery")) } }
                 .collect { rows ->
@@ -269,3 +295,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 }
+
+/** Four weeks: the map's chips reach back that far. */
+private const val MUSCLE_MAP_WINDOW_MS = 28L * 86_400_000L

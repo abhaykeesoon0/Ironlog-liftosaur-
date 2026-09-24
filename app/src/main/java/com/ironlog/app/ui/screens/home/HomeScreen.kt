@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.ironlog.app.ui.screens.home
 
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +97,17 @@ import kotlinx.coroutines.flow.flow
 import com.ironlog.app.ui.screens.rewards.titleText
 import androidx.compose.material.icons.filled.Restaurant
 import com.ironlog.app.ui.screens.nutrition.NutritionViewModel
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.Color
+import com.ironlog.app.data.entity.MusclePart
+import com.ironlog.app.data.entity.MuscleTint
+import com.ironlog.app.domain.usecase.MuscleParts
+import com.ironlog.app.ui.components.IronChip
+import com.ironlog.app.ui.components.MusclePartMap
+import com.ironlog.app.ui.theme.Slate800
 
 @Composable
 fun HomeScreen(
@@ -222,6 +235,13 @@ fun HomeScreen(
                     else "${state.weeklyGoal - state.workoutsThisWeek} to go for your weekly goal"
                 )
             }
+        }
+
+        // ------------------------------------------------------- muscle map
+        if (state.muscleWeeks.isNotEmpty()) {
+            Spacer(Modifier.height(Space.xl))
+            SectionHeader("Muscles trained")
+            MuscleMapCard(state.muscleWeeks, state.muscleTint, state.unit)
         }
 
         Spacer(Modifier.height(Space.xl))
@@ -796,3 +816,82 @@ private fun NutritionCard(onOpen: () -> Unit, viewModel: NutritionViewModel = hi
         }
     }
 }
+
+/**
+ * The body by muscle part, one week at a time. The figure carries only the
+ * shading; every number lives behind a press on the part, so the card stays
+ * the height of a figure however much was trained.
+ */
+@Composable
+private fun MuscleMapCard(weeks: List<MuscleParts.Week>, tint: MuscleTint, unit: UnitSystem) {
+    var weekIndex by rememberSaveable { mutableIntStateOf(0) }
+    var selected by remember { mutableStateOf<MusclePart?>(null) }
+    val week = weeks.getOrElse(weekIndex) { weeks.first() }
+    val intensity = week.parts.mapValues { (_, w) -> MuscleParts.intensity(w.sets) }
+    val colour = Color(tint.argb)
+
+    IronCard {
+        Column {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(Space.xs)
+            ) {
+                weeks.forEachIndexed { index, w ->
+                    IronChip(text = w.label, selected = index == weekIndex) { weekIndex = index; selected = null }
+                }
+            }
+            Spacer(Modifier.height(Space.md))
+            MusclePartMap(
+                intensity = intensity,
+                tint = colour,
+                selected = selected,
+                onPartClick = { selected = it }
+            )
+            Spacer(Modifier.height(Space.sm))
+            Caption(
+                if (week.isEmpty) "Nothing logged ${week.label.lowercase()}. Darker means more sets; press a muscle for its numbers."
+                else "${week.parts.size} muscles worked. Darker means more sets; press a muscle for its numbers."
+            )
+        }
+    }
+
+    selected?.let { part ->
+        MusclePartSheet(part, week, unit, onDismiss = { selected = null })
+    }
+}
+
+/** Everything about one part in one week: the sets, the volume, what did the work, and when. */
+@Composable
+private fun MusclePartSheet(part: MusclePart, week: MuscleParts.Week, unit: UnitSystem, onDismiss: () -> Unit) {
+    val work = week.parts[part]
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Slate800) {
+        Column(Modifier.padding(start = Space.lg, end = Space.lg, bottom = Space.xl)) {
+            Text(part.label, style = MaterialTheme.typography.titleLarge, color = Chalk)
+            Caption("${part.group.label} \u00b7 ${week.label.lowercase()}")
+            Spacer(Modifier.height(Space.md))
+            if (work == null) {
+                Text("Not trained ${week.label.lowercase()}.", style = MaterialTheme.typography.bodyMedium, color = ChalkDim)
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    StatTile(formatSets(work.sets), "Working sets")
+                    StatTile(unit.formatVolume(work.volumeKg), "Volume")
+                    StatTile(formatRelativeDay(work.lastAt), "Last trained")
+                }
+                Spacer(Modifier.height(Space.md))
+                Caption("FROM")
+                work.exercises.forEach { (name, sets) ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = Space.xs), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(name, style = MaterialTheme.typography.bodyMedium, color = Chalk, modifier = Modifier.weight(1f))
+                        Text(if (sets == 1) "1 set" else "$sets sets", style = NumericType.small, color = ChalkDim)
+                    }
+                }
+                Spacer(Modifier.height(Space.sm))
+                Caption("Sets where this muscle only helped count as half.")
+            }
+        }
+    }
+}
+
+private fun formatSets(sets: Double): String =
+    if (sets % 1.0 == 0.0) sets.toInt().toString() else "%.1f".format(sets)

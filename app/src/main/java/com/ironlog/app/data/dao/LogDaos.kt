@@ -18,6 +18,7 @@ import com.ironlog.app.data.entity.WorkoutEntity
 import com.ironlog.app.data.entity.WorkoutExerciseEntity
 import com.ironlog.app.data.entity.WorkoutSetEntity
 import kotlinx.coroutines.flow.Flow
+import com.ironlog.app.data.dao.ExerciseWorkRow
 
 @Dao
 interface WorkoutDao {
@@ -248,6 +249,31 @@ interface WorkoutDao {
         """
     )
     suspend fun completedSetsFor(userId: String, exerciseId: String): List<HistoricSet>
+
+    /**
+     * Working sets and volume per exercise per finished workout, with the
+     * exercise's muscles, for the muscle map. Warm-ups are not work.
+     */
+    @Query(
+        """
+        SELECT e.name AS exerciseName,
+               e.primaryMuscle AS primaryMuscle,
+               e.secondaryMuscles AS secondaryMuscles,
+               w.startedAt AS startedAt,
+               SUM(CASE WHEN s.type != 'WARMUP' THEN 1 ELSE 0 END) AS sets,
+               COALESCE(SUM(CASE WHEN s.type != 'WARMUP'
+                    THEN COALESCE(s.weightKg, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0) AS volume
+        FROM workout_sets s
+        JOIN workout_exercises we ON we.id = s.workoutExerciseId
+        JOIN workouts w ON w.id = we.workoutId
+        JOIN exercises e ON e.id = we.exerciseId
+        WHERE w.userId = :userId AND w.finishedAt IS NOT NULL
+          AND s.isCompleted = 1 AND w.startedAt >= :since
+        GROUP BY w.id, e.id
+        ORDER BY w.startedAt DESC
+        """
+    )
+    fun observeExerciseWork(userId: String, since: Long): Flow<List<ExerciseWorkRow>>
 }
 
 @Dao
@@ -409,6 +435,7 @@ interface StrengthGoalDao {
         """
     )
     fun observeMuscleSessions(userId: String, since: Long): Flow<List<MuscleSessionRow>>
+
 }
 
 @Dao

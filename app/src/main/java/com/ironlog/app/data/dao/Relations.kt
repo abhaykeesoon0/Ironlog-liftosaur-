@@ -102,6 +102,16 @@ data class MuscleSessionRow(
     val volume: Double
 )
 
+/** One exercise in one finished workout: its muscles, its working sets and volume. */
+data class ExerciseWorkRow(
+    val exerciseName: String,
+    val primaryMuscle: MuscleGroup,
+    val secondaryMuscles: String,
+    val startedAt: Long,
+    val sets: Int,
+    val volume: Double
+)
+
 data class RecordWithExercise(
     @Embedded val record: PersonalRecordEntity,
     val exerciseName: String
