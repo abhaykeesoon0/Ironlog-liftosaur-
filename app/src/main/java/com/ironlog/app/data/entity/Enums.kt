@@ -127,6 +127,17 @@ enum class PhotoPose(val label: String) {
  * theirs to choose. Stored as the colour itself so the data layer does not
  * need to know anything about Compose.
  */
+/**
+ * What the user is training for, which shapes every prediction: the rep
+ * count a forecast is written for, and how many sets it suggests.
+ */
+enum class TrainingFocus(val label: String, val reps: Int, val sets: Int, val blurb: String) {
+    STRENGTH("Strength", 5, 5, "Heavy fives: predictions lean towards the bar"),
+    MUSCLE("Muscle", 8, 4, "Eights to twelves: predictions lean towards volume"),
+    ENDURANCE("Endurance", 15, 3, "Fifteens: lighter, longer sets"),
+    GENERAL("General", 8, 3, "A middle ground")
+}
+
 enum class MuscleTint(val label: String, val argb: Long) {
     PLUM("Plum", 0xFFA78BFA),
     CHALK("Chalk", 0xFFF2F5F7),

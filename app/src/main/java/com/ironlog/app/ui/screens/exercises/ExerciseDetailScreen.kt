@@ -48,6 +48,8 @@ import com.ironlog.app.ui.theme.Plate15
 import com.ironlog.app.ui.theme.Plate20
 import com.ironlog.app.ui.theme.Plate10
 import com.ironlog.app.ui.theme.Space
+import com.ironlog.app.domain.usecase.Predictor
+import com.ironlog.app.ui.components.StatTile
 
 @Composable
 fun ExerciseDetailScreen(
@@ -137,6 +139,7 @@ fun ExerciseDetailScreen(
                         }
                     }
                     item { ProgressChart(state) }
+                    state.forecast?.let { forecast -> item { PredictionCard(forecast, state.projected1RmKg, state.unit) } }
 
                     item { SectionHeader("Sessions") }
                     items(state.sessions.reversed(), key = { it.workoutId }) { session ->
@@ -166,6 +169,32 @@ fun ExerciseDetailScreen(
                 }
                 item { Spacer(Modifier.height(Space.xl)) }
             }
+        }
+    }
+}
+
+/** The next session and the month ahead, predicted on the phone from the sessions charted above. */
+@Composable
+private fun PredictionCard(forecast: Predictor.Forecast, projected1RmKg: Double?, unit: UnitSystem) {
+    IronCard {
+        Column {
+            Caption("PREDICTED")
+            Spacer(Modifier.height(Space.sm))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                StatTile("${unit.formatWeight(forecast.weightKg)} \u00d7 ${forecast.reps}", "Next top set")
+                StatTile(forecast.sets.toString(), "Sets")
+                StatTile(unit.formatWeight(forecast.oneRmKg), "Est. 1RM next")
+            }
+            projected1RmKg?.let {
+                Spacer(Modifier.height(Space.sm))
+                Text(
+                    "In four weeks, at this rate: about ${unit.formatWeight(it)} estimated 1RM.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ChalkDim
+                )
+            }
+            Spacer(Modifier.height(Space.xs))
+            Caption(Predictor.describe(forecast) + ". Change what you train for in Settings.")
         }
     }
 }

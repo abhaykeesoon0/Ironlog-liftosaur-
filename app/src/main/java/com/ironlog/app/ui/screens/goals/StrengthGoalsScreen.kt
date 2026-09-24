@@ -220,7 +220,8 @@ private fun GoalCardView(goal: GoalCard, unit: UnitSystem, onDelete: () -> Unit)
             Spacer(Modifier.height(Space.xs))
             Caption(
                 if (goal.isAchieved) "Reached. Raise the target when you are ready."
-                else "${unit.weightValue(goal.remainingKg).let { it }} ${unit.weightSuffix} to go"
+                else "${unit.weightValue(goal.remainingKg)} ${unit.weightSuffix} to go" +
+                    (goal.weeksToGo?.let { w -> " \u00b7 at this rate, about ${if (w == 1) "a week" else "$w weeks"}" } ?: "")
             )
 
             // Two points are the minimum that can show a direction; one session

@@ -33,6 +33,7 @@ import com.ironlog.app.data.repository.BackupRepository
 import com.ironlog.app.data.repository.DEFAULT_LOCK_GRACE
 import com.ironlog.app.core.security.wipe
 import com.ironlog.app.core.widget.WidgetSummary
+import com.ironlog.app.data.entity.TrainingFocus
 
 data class SettingsUiState(
     val exporting: ExportKind? = null,
@@ -76,6 +77,9 @@ class SettingsViewModel @Inject constructor(
 
     val muscleTint: StateFlow<MuscleTint> = profileRepository.muscleTint
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MuscleTint.PLUM)
+
+    val trainingFocus: StateFlow<TrainingFocus> = profileRepository.trainingFocus
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TrainingFocus.GENERAL)
 
     val lockGrace: StateFlow<Int> = profileRepository.lockGraceSeconds
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DEFAULT_LOCK_GRACE)
@@ -126,6 +130,9 @@ class SettingsViewModel @Inject constructor(
 
     fun setLockGrace(seconds: Int) =
         persist("Could not change the lock timing") { profileRepository.setLockGrace(seconds) }
+
+    fun setTrainingFocus(focus: TrainingFocus) =
+        persist("Could not change the focus") { profileRepository.setTrainingFocus(focus) }
 
     fun setMuscleTint(tint: MuscleTint) =
         persist("Could not change the colour") { profileRepository.setMuscleTint(tint) }

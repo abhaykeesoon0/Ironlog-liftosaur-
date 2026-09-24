@@ -34,12 +34,16 @@ import com.ironlog.app.core.sensors.HealthConnectWriter
 import com.ironlog.app.core.sensors.VoiceSetInput
 import com.ironlog.app.domain.usecase.SetPhrase
 import com.ironlog.app.ui.format.formatWeight
+import com.ironlog.app.data.repository.ExerciseRepository
+import com.ironlog.app.domain.usecase.Predictor
 
 /** One exercise card: the live sets plus the last session's sets for the PREVIOUS column. */
 data class ExerciseBlock(
     val item: WorkoutExerciseWithDetail,
     val sets: List<WorkoutSetEntity>,
-    val previous: List<WorkoutSetEntity>
+    val previous: List<WorkoutSetEntity>,
+    /** What the next top set is expected to be, from past sessions; null with nothing to go on. */
+    val forecast: Predictor.Forecast? = null
 ) {
     val id: String get() = item.workoutExercise.id
 }
@@ -68,6 +72,7 @@ sealed interface ActiveWorkoutEvent {
 class ActiveWorkoutViewModel @Inject constructor(
     private val workoutRepository: WorkoutRepository,
     private val profile: ProfileRepository,
+    private val exerciseRepository: ExerciseRepository,
     private val restTimer: RestTimerController,
     private val repCounter: RepCounter,
     private val voice: VoiceSetInput,
@@ -127,6 +132,9 @@ class ActiveWorkoutViewModel @Inject constructor(
     /** Previous-session sets per exercise id, fetched once per exercise. */
     private val previousCache = MutableStateFlow<Map<String, List<WorkoutSetEntity>>>(emptyMap())
 
+    /** Forecasts per exercise id, computed once per exercise from its finished sessions. */
+    private val forecastCache = MutableStateFlow<Map<String, Predictor.Forecast?>>(emptyMap())
+
     /**
      * Field edits not yet confirmed by the database, keyed by set id. A Room
      * emission can arrive carrying an older snapshot than the user's latest
@@ -143,22 +151,25 @@ class ActiveWorkoutViewModel @Inject constructor(
         val active: com.ironlog.app.data.dao.WorkoutWithDetail?,
         val user: com.ironlog.app.data.entity.UserEntity?,
         val previous: Map<String, List<WorkoutSetEntity>>,
+        val forecasts: Map<String, Predictor.Forecast?>,
         val equipment: EquipmentSettings,
         val tint: MuscleTint
     )
 
     init {
         viewModelScope.launch {
+            // The two caches travel together so the combine stays within five flows.
+            val caches = combine(previousCache, forecastCache) { p, f -> p to f }
             combine(
                 workoutRepository.observeActive(),
                 profile.observeUser(),
-                previousCache,
+                caches,
                 profile.equipment,
                 profile.muscleTint
-            ) { active, user, previous, equipment, tint ->
-                Loaded(active, user, previous, equipment, tint)
+            ) { active, user, (previous, forecasts), equipment, tint ->
+                Loaded(active, user, previous, forecasts, equipment, tint)
             }
-                .collect { (active, user, previous, equipment, tint) ->
+                .collect { (active, user, previous, forecasts, equipment, tint) ->
                     if (active == null) {
                         // Null before the first load means there is no session; null
                         // later means it was discarded. Either way the screen closes,
@@ -176,7 +187,8 @@ class ActiveWorkoutViewModel @Inject constructor(
                             ExerciseBlock(
                                 item = item,
                                 sets = item.sets.sortedBy { it.setNumber },
-                                previous = previous[item.exercise.id].orEmpty()
+                                previous = previous[item.exercise.id].orEmpty(),
+                                forecast = forecasts[item.exercise.id]
                             )
                         }
                     // Drop overlay entries the database has caught up with.
@@ -211,6 +223,21 @@ class ActiveWorkoutViewModel @Inject constructor(
                 workoutRepository.previousSets(id, workoutId)
                     .onSuccess { sets -> previousCache.update { it + (id to sets) } }
                     .onFailure { _message.value = it.userMessage("Couldn't load your previous sets") }
+            }
+        }
+        viewModelScope.launch {
+            // The forecast reads finished sessions only, so the workout in
+            // progress never predicts itself.
+            val focus = profile.trainingFocus.first()
+            val unit = profile.observeUser().first()?.unitSystem ?: UnitSystem.METRIC
+            val increment = if (unit == UnitSystem.METRIC) 2.5 else TrainingMath.lbToKg(5.0)
+            exerciseIds.forEach { id ->
+                val forecast = runCatching {
+                    val samples = exerciseRepository.observeHistory(id).first()
+                        .map { Predictor.Sample(it.startedAt, it.bestWeight, it.bestReps) }
+                    Predictor.forecast(samples, focus, increment)
+                }.onFailure { _message.value = it.userMessage("Couldn't work out a prediction") }.getOrNull()
+                forecastCache.update { it + (id to forecast) }
             }
         }
     }
@@ -321,6 +348,22 @@ class ActiveWorkoutViewModel @Inject constructor(
     }
 
     fun setWeight(setId: String, kg: Double?) = editSet(setId) { it.copy(weightKg = kg) }
+
+    /**
+     * Writes the forecast into the exercise's empty, unticked rows. Rows the
+     * user has already typed in are theirs and are left alone.
+     */
+    fun applyForecast(workoutExerciseId: String) {
+        val block = _state.value.exercises.firstOrNull { it.id == workoutExerciseId } ?: return
+        val forecast = block.forecast ?: return
+        // A routine may have put a weight in already; only the gaps are filled.
+        val open = block.sets.filter { !it.isCompleted && (it.weightKg == null || it.reps == null) }
+        if (open.isEmpty()) { _message.value = "Every set already has a value"; return }
+        open.forEach { set ->
+            if (set.weightKg == null) setWeight(set.id, forecast.weightKg)
+            if (set.reps == null) setReps(set.id, forecast.reps)
+        }
+    }
     fun setReps(setId: String, reps: Int?) = editSet(setId) { it.copy(reps = reps) }
     fun setDuration(setId: String, seconds: Int?) = editSet(setId) { it.copy(durationSeconds = seconds) }
     fun setDistance(setId: String, meters: Double?) = editSet(setId) { it.copy(distanceMeters = meters) }
