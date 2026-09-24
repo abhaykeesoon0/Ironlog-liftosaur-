@@ -55,6 +55,8 @@ import javax.inject.Singleton
 import com.ironlog.app.data.dao.NutritionDao
 import com.ironlog.app.data.repository.NutritionRepository
 import com.ironlog.app.data.repository.NutritionRepositoryImpl
+import com.ironlog.app.data.repository.BackupRepository
+import com.ironlog.app.data.repository.BackupRepositoryImpl
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
@@ -316,6 +318,9 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindNutritionRepository(impl: NutritionRepositoryImpl): NutritionRepository
+
+    @Binds @Singleton
+    abstract fun bindBackupRepository(impl: BackupRepositoryImpl): BackupRepository
 
     @Binds @Singleton
     abstract fun bindProfileRepository(impl: ProfileRepositoryImpl): ProfileRepository

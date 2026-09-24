@@ -40,6 +40,8 @@ interface BodyRepository {
     fun observePhotos(): Flow<List<ProgressPhotoEntity>>
     suspend fun addMeasurement(input: MeasurementInput): Result<Unit>
     suspend fun deleteMeasurement(item: BodyMeasurementEntity): Result<Unit>
+    /** Puts a deleted measurement back, for the undo bar. */
+    suspend fun restoreMeasurement(item: BodyMeasurementEntity): Result<Unit>
 
     /** Takes ownership of a file already written to private storage by [PhotoStore]. */
     suspend fun addPhoto(filePath: String, pose: PhotoPose, note: String): Result<Unit>
@@ -94,6 +96,13 @@ class BodyRepositoryImpl @Inject constructor(
                 userDao.findById(userId)?.let { userDao.update(it.copy(bodyweightKg = weight)) }
             }
             Unit
+        }
+    }
+
+    override suspend fun restoreMeasurement(item: BodyMeasurementEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (item.userId != currentUser.require()) throw UserFacingException("Measurement not found")
+            bodyDao.upsertMeasurement(item)
         }
     }
 

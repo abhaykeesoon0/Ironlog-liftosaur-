@@ -4,6 +4,8 @@ import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.os.IBinder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -96,6 +98,9 @@ class RestTimerService : Service() {
     }
 
     private fun stopTimer(finished: Boolean) {
+        // The end of the rest is felt as well as heard: a short double pulse,
+        // which is enough to notice with the phone face down on the bench.
+        if (finished) buzz()
         tickJob?.cancel()
         tickJob = null
         _isRunning.value = false
@@ -114,6 +119,12 @@ class RestTimerService : Service() {
         scope = null
         _isRunning.value = false
         super.onDestroy()
+    }
+
+    private fun buzz() {
+        val vibrator = getSystemService(Vibrator::class.java) ?: return
+        if (!vibrator.hasVibrator()) return
+        vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 120, 90, 120), -1))
     }
 
     companion object {

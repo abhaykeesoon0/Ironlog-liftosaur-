@@ -72,6 +72,12 @@ import com.ironlog.app.ui.theme.Slate800
 import com.ironlog.app.ui.theme.Space
 import com.ironlog.app.ui.theme.Touch
 import com.ironlog.app.data.entity.MuscleTint
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.ironlog.app.core.security.BackupCrypto
+import com.ironlog.app.data.repository.LOCK_GRACE_OPTIONS
+import com.ironlog.app.ui.components.ConfirmDialog
+import com.ironlog.app.ui.components.PassphraseDialog
 
 @Composable
 fun SettingsScreen(
@@ -91,6 +97,44 @@ fun SettingsScreen(
     val context = LocalContext.current
     val notifications = rememberPermissionState(AppPermission.NOTIFICATIONS)
     var showDelete by remember { mutableStateOf(false) }
+    val lockGrace by viewModel.lockGrace.collectAsStateWithLifecycle()
+    var askBackupPassphrase by remember { mutableStateOf(false) }
+    val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::onRestoreFileChosen)
+    }
+
+    if (askBackupPassphrase) {
+        PassphraseDialog(
+            title = "Seal the backup",
+            body = "Choose a passphrase of at least ${BackupCrypto.MIN_PASSPHRASE} characters. It is not stored anywhere: " +
+                "lose it and the backup cannot be opened, by you or by anyone.",
+            confirmLabel = "Create backup",
+            minLength = BackupCrypto.MIN_PASSPHRASE,
+            onConfirm = { pass -> askBackupPassphrase = false; viewModel.backupEncrypted(pass) },
+            onDismiss = { askBackupPassphrase = false }
+        )
+    }
+    state.restoreUri?.let {
+        if (state.restoreNeedsPassphrase) {
+            PassphraseDialog(
+                title = "Open the backup",
+                body = "Enter the passphrase this backup was sealed with.",
+                confirmLabel = "Restore",
+                minLength = 1,
+                onConfirm = { pass -> viewModel.restore(pass) },
+                onDismiss = viewModel::cancelRestore
+            )
+        } else {
+            ConfirmDialog(
+                title = "Restore this backup?",
+                body = "Workouts, routines, measurements and cardio in the file are added to this account. Nothing already here is changed.",
+                confirmLabel = "Restore",
+                onConfirm = { viewModel.restore(null) },
+                onDismiss = viewModel::cancelRestore,
+                destructive = false
+            )
+        }
+    }
 
     // Permission and biometric state can change in system Settings while the app
     // is in the background, so both are re-read on every resume.
@@ -384,6 +428,25 @@ fun SettingsScreen(
                             }
                         }
                     )
+                    if (lockOn) {
+                        Spacer(Modifier.height(Space.sm))
+                        Text("Ask again after", style = MaterialTheme.typography.bodyLarge, color = Chalk)
+                        Spacer(Modifier.height(Space.xs))
+                        Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                            LOCK_GRACE_OPTIONS.forEach { seconds ->
+                                IronChip(
+                                    text = when {
+                                        seconds == 0 -> "Straight away"
+                                        seconds < 60 -> "${seconds}s"
+                                        else -> "${seconds / 60} min"
+                                    },
+                                    selected = lockGrace == seconds,
+                                    onClick = { viewModel.setLockGrace(seconds) }
+                                )
+                            }
+                        }
+                        Caption("How long IronLog can be in the background before the lock asks again.", Modifier.padding(top = Space.xs))
+                    }
                     Hairline(Modifier.padding(vertical = Space.sm))
                     NavRow(Icons.Default.Key, "Change password", onChangePassword)
                 }
@@ -419,6 +482,26 @@ fun SettingsScreen(
                             onClick = { viewModel.export(kind) }
                         )
                     }
+                    Hairline(Modifier.padding(vertical = Space.sm))
+                    // The two that carry the whole log across phones. The sealed
+                    // backup is the one to keep; the plain JSON above is for reading.
+                    ExportRow(
+                        label = "Encrypted backup (.ironlog)",
+                        busy = state.isBackingUp,
+                        enabled = !state.isBackingUp && !state.isRestoring,
+                        onClick = { askBackupPassphrase = true }
+                    )
+                    ExportRow(
+                        label = "Restore from a backup",
+                        busy = state.isRestoring,
+                        enabled = !state.isBackingUp && !state.isRestoring,
+                        onClick = { pickBackup.launch(arrayOf("*/*")) }
+                    )
+                    Caption(
+                        "A backup is sealed with a passphrase of your choosing and can be restored on any phone with " +
+                            "IronLog. Restoring adds what is missing and leaves what is already here.",
+                        Modifier.padding(top = Space.xs)
+                    )
                 }
             }
 

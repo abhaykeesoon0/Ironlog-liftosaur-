@@ -313,7 +313,10 @@ class MainViewModel @Inject constructor(
             // has itself expired signs the user out here rather than mid-workout.
             if (!authRepository.refreshIfNeeded()) return@launch
             val lockEnabled = authRepository.currentUser()?.biometricLockEnabled == true
-            if (lockEnabled && System.currentTimeMillis() - leftAt >= LOCK_GRACE_MS) {
+            // The grace is the user's: straight away for a shared phone, a few
+            // minutes for one that only ever leaves their pocket in the gym.
+            val graceMs = profileRepository.lockGraceSeconds.first() * 1000L
+            if (lockEnabled && System.currentTimeMillis() - leftAt >= graceMs) {
                 authRepository.lock()
             }
         }
@@ -331,6 +334,5 @@ class MainViewModel @Inject constructor(
 
     private companion object {
         /** A glance at a notification should not demand a fingerprint on return. */
-        const val LOCK_GRACE_MS = 15_000L
     }
 }

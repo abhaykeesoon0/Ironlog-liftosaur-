@@ -86,6 +86,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.ironlog.app.ui.theme.Slate900
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import com.ironlog.app.ui.components.UndoSnackbar
 
 /**
  * Today's food against the targets, meal by meal.
@@ -103,6 +106,9 @@ fun NutritionScreen(
     viewModel: NutritionViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val undo by viewModel.undo.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    UndoSnackbar(snackbar, undo) { viewModel.consumeUndo() }
     var addingTo by remember { mutableStateOf<Meal?>(null) }
     var editingGoal by remember { mutableStateOf(false) }
 
@@ -113,6 +119,7 @@ fun NutritionScreen(
         }
     }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         IronTopBar(title = "Nutrition", onBack = onBack)
 
@@ -179,6 +186,8 @@ fun NutritionScreen(
             }
             item { Spacer(Modifier.height(Space.xl)) }
         }
+    }
+    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(Space.lg))
     }
 
     addingTo?.let { meal ->

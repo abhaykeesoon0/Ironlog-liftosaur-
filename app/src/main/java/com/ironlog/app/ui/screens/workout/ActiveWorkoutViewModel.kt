@@ -28,6 +28,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import com.ironlog.app.data.entity.MuscleTint
+import com.ironlog.app.ui.components.Undo
 
 /** One exercise card: the live sets plus the last session's sets for the PREVIOUS column. */
 data class ExerciseBlock(
@@ -249,9 +250,24 @@ class ActiveWorkoutViewModel @Inject constructor(
 
     // ---------------------------------------------------------------- set level
 
+    /** The last thing removed, offered back for a few seconds. */
+    private val _undo = MutableStateFlow<Undo?>(null)
+    val undo: StateFlow<Undo?> = _undo.asStateFlow()
+    fun consumeUndo() { _undo.value = null }
+
     fun deleteSet(setId: String) {
         overlay.remove(setId)
-        launchResult("Couldn't delete the set") { writeLock.withLock { workoutRepository.deleteSet(setId) } }
+        val removed = findSet(setId)
+        launchResult("Couldn't delete the set") {
+            writeLock.withLock { workoutRepository.deleteSet(setId) }.onSuccess {
+                if (removed != null) {
+                    _undo.value = Undo("Set ${removed.setNumber} removed") {
+                        writeLock.withLock { workoutRepository.restoreSet(removed) }
+                            .onFailure { e -> _message.value = e.userMessage("Couldn't restore the set") }
+                    }
+                }
+            }
+        }
     }
 
     /** Warm-up -> working -> drop -> failure -> warm-up. */

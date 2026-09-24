@@ -19,6 +19,8 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.ironlog.app.core.security.LoginThrottle
+import java.security.MessageDigest
 
 sealed interface AuthResult {
     data class Success(val userId: String) : AuthResult
@@ -139,6 +141,16 @@ class AuthRepositoryImpl @Inject constructor(
                     return@withContext AuthResult.Failure("Enter your password", AuthField.PASSWORD)
                 }
 
+                // Held back after a run of failures on this address. Checked
+                // before the password is even looked at, so a locked account
+                // costs an attacker the wait rather than a hash comparison.
+                val throttleKey = throttleKey(cleanEmail)
+                val now = System.currentTimeMillis()
+                val (failures, lockedUntil) = tokenStore.loginThrottle(throttleKey)
+                val throttle = LoginThrottle.State(failures, lockedUntil)
+                val wait = LoginThrottle.remainingLockMs(throttle, now)
+                if (wait > 0) return@withContext AuthResult.Failure(LoginThrottle.describe(wait))
+
                 val user = userDao.findByEmail(cleanEmail)
 
                 // A fixed delay on every attempt, and one message for both a
@@ -148,13 +160,16 @@ class AuthRepositoryImpl @Inject constructor(
                 // leak the same thing through timing.
                 delay(FAILED_ATTEMPT_DELAY_MS)
 
-                if (user == null) {
-                    return@withContext AuthResult.Failure("Email or password is incorrect")
-                }
-                if (!hasher.verify(password, user.passwordSalt, user.passwordHash)) {
-                    return@withContext AuthResult.Failure("Email or password is incorrect")
+                if (user == null || !hasher.verify(password, user.passwordSalt, user.passwordHash)) {
+                    val next = LoginThrottle.afterFailure(throttle, now)
+                    tokenStore.saveLoginThrottle(throttleKey, next.failures, next.lockedUntil)
+                    val remaining = LoginThrottle.remainingLockMs(next, now)
+                    return@withContext AuthResult.Failure(
+                        if (remaining > 0) LoginThrottle.describe(remaining) else "Email or password is incorrect"
+                    )
                 }
 
+                tokenStore.saveLoginThrottle(throttleKey, 0, 0L)
                 issueSession(user)
                 AuthResult.Success(user.id)
             } catch (e: Exception) {
@@ -163,6 +178,11 @@ class AuthRepositoryImpl @Inject constructor(
                 password.wipe()
             }
         }
+
+    /** A hash of the address, so the throttle store is not a list of accounts. */
+    private fun throttleKey(email: String): String =
+        MessageDigest.getInstance("SHA-256").digest(email.toByteArray()).take(12)
+            .joinToString("") { "%02x".format(it) }
 
     /**
      * Cold-start path. Verifies the stored access token, silently refreshes it if

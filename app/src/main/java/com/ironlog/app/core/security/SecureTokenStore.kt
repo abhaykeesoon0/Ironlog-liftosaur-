@@ -84,6 +84,14 @@ class SecureTokenStore @Inject constructor(
         }.apply()
     }
 
+    /** Failures and the lock deadline for one account, keyed by a hash of the email. */
+    fun loginThrottle(key: String): Pair<Int, Long> =
+        prefs.getInt("throttle_f_$key", 0) to prefs.getLong("throttle_u_$key", 0L)
+
+    fun saveLoginThrottle(key: String, failures: Int, lockedUntil: Long) {
+        prefs.edit().putInt("throttle_f_$key", failures).putLong("throttle_u_$key", lockedUntil).apply()
+    }
+
     fun clearSession() {
         prefs.edit()
             .remove(KEY_USER_ID)

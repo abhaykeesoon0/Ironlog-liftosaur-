@@ -64,6 +64,10 @@ data class EquipmentSettings(
     }
 }
 
+/** The waits a user can pick before the app lock asks again. Zero is straight away. */
+val LOCK_GRACE_OPTIONS = listOf(0, 15, 60, 300, 900)
+const val DEFAULT_LOCK_GRACE = 15
+
 interface ProfileRepository {
     fun observeUser(): Flow<UserEntity?>
     val reminderSettings: Flow<ReminderSettings>
@@ -92,6 +96,9 @@ interface ProfileRepository {
     suspend fun setPlateSet(plateSet: PlateSet): Result<Unit>
     suspend fun setStepSource(source: StepSource): Result<Unit>
     val muscleTint: Flow<MuscleTint>
+    /** How long the app may be in the background before the lock asks again. */
+    val lockGraceSeconds: Flow<Int>
+    suspend fun setLockGrace(seconds: Int): Result<Unit>
     suspend fun setMuscleTint(tint: MuscleTint): Result<Unit>
     suspend fun setBarWeight(barWeightKg: Double): Result<Unit>
 
@@ -137,6 +144,16 @@ class ProfileRepositoryImpl @Inject constructor(
             // racks does not leave a 20 kg bar sitting under pound plates.
             barWeightKg = prefs[KEY_BAR_WEIGHT] ?: TrainingMath.defaultBarKg(set)
         )
+    }
+
+    override val lockGraceSeconds: Flow<Int> = dataStore.data.map { prefs -> prefs[KEY_LOCK_GRACE] ?: DEFAULT_LOCK_GRACE }
+
+    override suspend fun setLockGrace(seconds: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (seconds !in LOCK_GRACE_OPTIONS) throw UserFacingException("Pick one of the listed times")
+            dataStore.edit { prefs -> prefs[KEY_LOCK_GRACE] = seconds }
+            Unit
+        }
     }
 
     override val muscleTint: Flow<MuscleTint> = dataStore.data.map { prefs ->
@@ -307,6 +324,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_PLATE_SET = stringPreferencesKey("plate_set")
         val KEY_STEP_SOURCE = stringPreferencesKey("step_source")
         val KEY_MUSCLE_TINT = stringPreferencesKey("muscle_tint")
+        val KEY_LOCK_GRACE = intPreferencesKey("lock_grace_seconds")
         val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")
 
     }

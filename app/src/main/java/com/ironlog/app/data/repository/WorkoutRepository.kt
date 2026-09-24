@@ -96,6 +96,8 @@ interface WorkoutRepository {
     suspend fun addSet(workoutExerciseId: String): Result<Unit>
     suspend fun updateSet(set: WorkoutSetEntity): Result<Unit>
     suspend fun deleteSet(setId: String): Result<Unit>
+    /** Puts a deleted set back, exactly as it was, and renumbers the rows around it. */
+    suspend fun restoreSet(set: WorkoutSetEntity): Result<Unit>
 
     /**
      * Toggles a set. When completing a set with empty fields, [fallbackWeightKg]
@@ -298,6 +300,21 @@ class WorkoutRepositoryImpl @Inject constructor(
         validateSet(set)
         workoutDao.upsertSet(set.copy(workoutExerciseId = existing.workoutExerciseId))
         if (existing.isCompleted) refreshLiveRecords(existing.workoutExerciseId)
+    }
+
+    override suspend fun restoreSet(set: WorkoutSetEntity): Result<Unit> = io {
+        ownedWorkoutExercise(set.workoutExerciseId)
+        db.withTransaction {
+            workoutDao.upsertSet(set)
+            // Renumber by the numbers the rows carry, so the restored set lands
+            // where it was and the rest read 1, 2, 3 again.
+            workoutDao.setsFor(set.workoutExerciseId)
+                .sortedWith(compareBy({ it.setNumber }, { it.id != set.id }))
+                .forEachIndexed { index, row ->
+                    if (row.setNumber != index + 1) workoutDao.upsertSet(row.copy(setNumber = index + 1))
+                }
+            if (set.isCompleted) refreshLiveRecords(set.workoutExerciseId)
+        }
     }
 
     override suspend fun deleteSet(setId: String): Result<Unit> = io {
