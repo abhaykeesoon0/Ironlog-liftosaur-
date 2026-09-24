@@ -107,6 +107,9 @@ fun SettingsScreen(
     val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::onRestoreFileChosen)
     }
+    val pickCsv = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importCsv)
+    }
 
     if (askBackupPassphrase) {
         PassphraseDialog(
@@ -541,6 +544,12 @@ fun SettingsScreen(
                         busy = state.isRestoring,
                         enabled = !state.isBackingUp && !state.isRestoring,
                         onClick = { pickBackup.launch(arrayOf("*/*")) }
+                    )
+                    ExportRow(
+                        label = "Import from Strong or Hevy (CSV)",
+                        busy = state.isRestoring,
+                        enabled = !state.isBackingUp && !state.isRestoring,
+                        onClick = { pickCsv.launch(arrayOf("text/*", "text/csv", "text/comma-separated-values", "application/csv", "*/*")) }
                     )
                     Caption(
                         "A backup is sealed with a passphrase of your choosing and can be restored on any phone with " +

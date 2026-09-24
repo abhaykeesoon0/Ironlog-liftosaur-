@@ -44,6 +44,8 @@ data class WorkoutDetailUiState(
     val nextTargets: List<NextTarget> = emptyList(),
     val isDeleting: Boolean = false,
     val isDeleted: Boolean = false,
+    /** Set once a repeat has started, for the screen to open the workout. */
+    val repeatStarted: Boolean = false,
     val error: String? = null
 ) {
     val totalReps: Int
@@ -222,6 +224,17 @@ class WorkoutDetailViewModel @Inject constructor(
     }
 
     fun showError(message: String) = _state.update { it.copy(error = message) }
+
+    /** The same session again, today: same exercises, same number of sets, nothing filled in. */
+    fun repeat() {
+        viewModelScope.launch {
+            workoutRepository.repeat(workoutId)
+                .onSuccess { _state.update { it.copy(repeatStarted = true) } }
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Couldn't start the workout")) } }
+        }
+    }
+
+    fun consumeRepeat() = _state.update { it.copy(repeatStarted = false) }
 
     fun dismissError() = _state.update { it.copy(error = null) }
 }

@@ -73,11 +73,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import com.ironlog.app.data.repository.userMessage
 import com.ironlog.app.ui.theme.Slate800
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Replay
+import com.ironlog.app.ui.components.SecondaryButton
 
 @Composable
 fun WorkoutDetailScreen(
     onBack: () -> Unit,
     onOpenExercise: (String) -> Unit,
+    onRepeat: () -> Unit = {},
     viewModel: WorkoutDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -86,6 +89,9 @@ fun WorkoutDetailScreen(
 
     LaunchedEffect(state.isDeleted) {
         if (state.isDeleted) onBack()
+    }
+    LaunchedEffect(state.repeatStarted) {
+        if (state.repeatStarted) { viewModel.consumeRepeat(); onRepeat() }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -201,6 +207,13 @@ fun WorkoutDetailScreen(
                             )
                         }
                     }
+                }
+                item {
+                    SecondaryButton(
+                        text = "Repeat this workout",
+                        onClick = viewModel::repeat,
+                        leadingIcon = Icons.Default.Replay
+                    )
                 }
                 if (state.justFinished && state.nextTargets.isNotEmpty()) {
                     item {

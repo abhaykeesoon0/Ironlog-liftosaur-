@@ -34,6 +34,7 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.ironlog.app.core.security.wipe
+import com.ironlog.app.core.media.CsvImport
 
 /** What a restore brought in, so the user is told rather than left to look. */
 data class RestoreSummary(
@@ -62,6 +63,8 @@ interface BackupRepository {
      * twice, or restoring over a log that already has half of it, is safe.
      */
     suspend fun restore(uri: Uri, passphrase: CharArray?): Result<RestoreSummary>
+    /** Reads a Strong or Hevy CSV export and adds its workouts, matching exercises by name. */
+    suspend fun importCsv(uri: Uri): Result<RestoreSummary>
 }
 
 @Singleton
@@ -97,6 +100,20 @@ class BackupRepositoryImpl @Inject constructor(
             }
         } finally {
             passphrase.wipe()
+        }
+    }
+
+    override suspend fun importCsv(uri: Uri): Result<RestoreSummary> = withContext(Dispatchers.IO) {
+        runCatching {
+            val userId = currentUser.require()
+            val text = read(uri).decodeToString()
+            val parsed = try {
+                CsvImport.parse(text)
+            } catch (e: CsvImport.UnrecognisedException) {
+                throw UserFacingException("That is not a Strong or Hevy export. Export as CSV from the other app and try again.")
+            }
+            if (parsed.backup.workouts.isEmpty()) throw UserFacingException("No workouts found in that file")
+            db.withTransaction { restoreInto(userId, parsed.backup) }
         }
     }
 
@@ -140,6 +157,9 @@ class BackupRepositoryImpl @Inject constructor(
         suspend fun exercise(id: String, name: String): ExerciseEntity {
             knownExercises[id]?.let { return it }
             exerciseDao.findById(id)?.let { knownExercises[id] = it; return it }
+            // An imported row carries another app's name, not one of our ids:
+            // the library entry of the same name is the same movement.
+            exerciseDao.findByName(name.trim(), userId)?.let { knownExercises[id] = it; return it }
             val made = ExerciseEntity(
                 id = UUID.randomUUID().toString(),
                 name = Validators.sanitiseSingleLine(name, 60).ifBlank { "Restored exercise" },

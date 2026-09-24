@@ -231,6 +231,27 @@ class SettingsViewModel @Inject constructor(
 
     fun cancelRestore() = _state.update { it.copy(restoreUri = null, restoreNeedsPassphrase = false) }
 
+    /** Strong or Hevy CSV: read, matched by exercise name, added like a restore. */
+    fun importCsv(uri: Uri) {
+        if (_state.value.isRestoring) return
+        _state.update { it.copy(isRestoring = true, error = null) }
+        viewModelScope.launch {
+            backupRepository.importCsv(uri)
+                .onSuccess { summary ->
+                    _state.update {
+                        it.copy(
+                            isRestoring = false,
+                            message = if (summary.workouts == 0) "Nothing new in that file"
+                            else "Imported ${summary.workouts} workout(s)" +
+                                (if (summary.exercisesCreated > 0) ", ${summary.exercisesCreated} new exercise(s)" else "") +
+                                (if (summary.skipped > 0) "; ${summary.skipped} already here" else "")
+                        )
+                    }
+                }
+                .onFailure { e -> _state.update { it.copy(isRestoring = false, error = e.userMessage("Could not import that file")) } }
+        }
+    }
+
     fun restore(passphrase: CharArray?) {
         val uri = _state.value.restoreUri ?: run { passphrase?.wipe(); return }
         _state.update { it.copy(isRestoring = true, error = null) }
