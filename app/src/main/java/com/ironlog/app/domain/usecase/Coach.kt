@@ -41,7 +41,9 @@ object Coach {
         /** Where the answer came from, shown under it so nothing looks oracular. */
         val source: String,
         /** True when the question looked medical and was deflected rather than answered. */
-        val isReferral: Boolean = false
+        val isReferral: Boolean = false,
+        /** True when nothing matched and this is the "I only know so much" reply. */
+        val isFallback: Boolean = false
     )
 
     /** Openers offered as chips, so the first question is never a blank page. */
@@ -271,9 +273,10 @@ object Coach {
         "I can answer questions about training, recovery, programming and your own numbers — what to " +
             "train today, how to add weight, how much to rest, how you are progressing.\n\n" +
             "I am a built-in coach rather than a language model, so I only know what I was written " +
-            "with and what is in your log. For anything broader, you can turn on the cloud assistant " +
-            "in Settings, which sends the question to Claude.",
-        "Coach"
+            "with and what is in your log. For anything broader, turn on web lookups below, or the " +
+            "cloud assistant in Settings.",
+        "Coach",
+        isFallback = true
     )
 
     private fun format(value: Double): String =

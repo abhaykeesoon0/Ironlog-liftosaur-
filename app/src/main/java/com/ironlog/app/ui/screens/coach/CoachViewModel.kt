@@ -23,19 +23,24 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+import com.ironlog.app.core.ai.WebFact
+import com.ironlog.app.core.ai.WebLookup
 
 data class CoachMessage(
     val text: String,
     val fromUser: Boolean,
     val source: String? = null,
-    val isReferral: Boolean = false
+    val isReferral: Boolean = false,
+    /** Where a web-sourced answer was read, so the user can open it and check. */
+    val url: String? = null
 )
 
 /** Which brain answered, shown so the user knows what they are reading. */
 enum class CoachEngine(val label: String) {
     RULES("Built-in coach"),
     ON_DEVICE("Gemini Nano, on this phone"),
-    CLOUD("Claude")
+    CLOUD("Claude"),
+    WEB("Web lookup")
 }
 
 data class CoachUiState(
@@ -50,6 +55,8 @@ data class CoachUiState(
     val cloudAvailable: Boolean = false,
     val useCloud: Boolean = false,
     val onDeviceAvailable: Boolean = false,
+    /** Whether the coach may look the topic up online (keyless; only the topic leaves the phone). */
+    val webLookups: Boolean = false,
     val error: String? = null
 )
 
@@ -60,7 +67,8 @@ class CoachViewModel @Inject constructor(
     private val goalRepository: StrengthGoalRepository,
     private val bodyRepository: BodyRepository,
     private val cloudAssistant: CloudAssistant,
-    private val onDeviceAssistant: OnDeviceAssistant
+    private val onDeviceAssistant: OnDeviceAssistant,
+    private val webLookup: WebLookup
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CoachUiState())
@@ -75,6 +83,10 @@ class CoachViewModel @Inject constructor(
         _state.update { it.copy(cloudAvailable = hasKey) }
 
         viewModelScope.launch {
+            profileRepository.webLookupsEnabled.collect { on -> _state.update { it.copy(webLookups = on) } }
+        }
+
+        viewModelScope.launch {
             // Only a handful of phones carry Gemini Nano, so this is a question
             // asked once and answered honestly rather than a feature assumed.
             val ready = onDeviceAssistant.availability() == OnDeviceAssistant.Availability.READY
@@ -83,6 +95,13 @@ class CoachViewModel @Inject constructor(
     }
 
     fun setUseCloud(enabled: Boolean) = _state.update { it.copy(useCloud = enabled) }
+
+    fun setWebLookups(enabled: Boolean) {
+        viewModelScope.launch {
+            profileRepository.setWebLookups(enabled)
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Couldn't save that setting")) } }
+        }
+    }
 
     fun ask(question: String) {
         val clean = question.trim()
@@ -99,21 +118,30 @@ class CoachViewModel @Inject constructor(
         viewModelScope.launch {
             val context = gatherContext()
 
+            // A fact from the open web, when the user has allowed it. A failed
+            // lookup is reported, not hidden, and the question is still answered.
+            val fact = if (_state.value.webLookups) {
+                runCatching { webLookup.lookup(clean) }
+                    .onFailure { e -> _state.update { it.copy(error = e.userMessage("The web lookup failed")) } }
+                    .getOrNull()
+            } else null
+            val brief = describe(context) + (fact?.let { "\n" + reference(it) } ?: "")
+
             // On-device first when the phone has it: a real model, no network,
             // nothing leaving the handset. The cloud is only used when the user
             // has asked for it, and the rules coach catches everything else.
             if (!_state.value.useCloud && _state.value.onDeviceAvailable) {
-                val onDevice = onDeviceAssistant.ask(clean, describe(context))
+                val onDevice = onDeviceAssistant.ask(clean, brief)
                 if (onDevice != null) {
-                    reply(CoachMessage(onDevice, fromUser = false, source = CoachEngine.ON_DEVICE.label))
+                    reply(CoachMessage(onDevice, fromUser = false, source = withFact(CoachEngine.ON_DEVICE.label, fact), url = fact?.url))
                     return@launch
                 }
                 // Fell through: the model was there a moment ago and is not now.
             }
 
             if (_state.value.useCloud && _state.value.cloudAvailable) {
-                runCatching { cloudAssistant.ask(clean, describe(context)) }
-                    .onSuccess { reply -> reply(CoachMessage(reply, fromUser = false, source = CoachEngine.CLOUD.label)) }
+                runCatching { cloudAssistant.ask(clean, brief) }
+                    .onSuccess { reply -> reply(CoachMessage(reply, fromUser = false, source = withFact(CoachEngine.CLOUD.label, fact), url = fact?.url)) }
                     .onFailure { e ->
                         // Falls back rather than failing: the offline coach can
                         // still answer, which is better than an error bubble.
@@ -125,9 +153,46 @@ class CoachViewModel @Inject constructor(
                     }
             } else {
                 val answer = Coach.answer(clean, context)
-                reply(CoachMessage(answer.text, fromUser = false, source = answer.source, isReferral = answer.isReferral))
+                if (answer.isFallback && fact != null) {
+                    // The rules coach had nothing; the web did. Shown as what it
+                    // is -- a quoted reference, with its source and a link -- not
+                    // as the coach's own words.
+                    reply(
+                        CoachMessage(
+                            "${fact.title}\n\n${fact.extract}",
+                            fromUser = false,
+                            source = "${CoachEngine.WEB.label} \u00b7 ${fact.source}",
+                            url = fact.url
+                        )
+                    )
+                } else {
+                    reply(CoachMessage(answer.text, fromUser = false, source = answer.source, isReferral = answer.isReferral))
+                    // The rules coach matched something, but the user asked for
+                    // the web too, so what it found follows as its own bubble
+                    // rather than being lost. Not after a referral: a medical
+                    // question gets the referral and nothing that dilutes it.
+                    if (fact != null && !answer.isReferral) {
+                        reply(
+                            CoachMessage(
+                                "${fact.title}\n\n${fact.extract}",
+                                fromUser = false,
+                                source = "${CoachEngine.WEB.label} · ${fact.source}",
+                                url = fact.url
+                            )
+                        )
+                    }
+                }
             }
         }
+    }
+
+    private fun withFact(engine: String, fact: WebFact?): String =
+        if (fact == null) engine else "$engine \u00b7 with ${fact.source}"
+
+    /** The web fact as a short reference block for a model, clearly marked as not the user's data. */
+    private fun reference(fact: WebFact): String = buildString {
+        appendLine("Reference material from ${fact.source} (\"${fact.title}\"):")
+        appendLine(fact.extract)
     }
 
     private fun reply(message: CoachMessage) {

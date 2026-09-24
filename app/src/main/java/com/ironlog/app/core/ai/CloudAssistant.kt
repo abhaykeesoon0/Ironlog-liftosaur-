@@ -159,6 +159,7 @@ class CloudAssistant @Inject constructor(
             Answer questions about training, recovery, programming and general fitness.
 
             The user's own figures are given to you below; use them and do not invent others.
+            If reference material from the web is included, draw on it and name its source.
             Keep answers short enough to read on a phone: a few sentences or a short list.
 
             You are not a doctor. If the question is about pain, injury, illness, medication or
