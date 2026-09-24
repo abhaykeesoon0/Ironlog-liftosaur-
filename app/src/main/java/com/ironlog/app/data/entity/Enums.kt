@@ -42,6 +42,37 @@ enum class MuscleGroup(val label: String) {
 }
 
 /**
+ * The finer anatomy under [MuscleGroup]: the parts a lifter actually talks
+ * about -- upper and lower chest, the three heads of the delt, the heads of
+ * the arms -- each belonging to one coarse group so nothing stored changes.
+ */
+enum class MusclePart(val label: String, val group: MuscleGroup) {
+    UPPER_CHEST("Upper chest", MuscleGroup.CHEST),
+    LOWER_CHEST("Lower chest", MuscleGroup.CHEST),
+    LATS("Lats", MuscleGroup.LATS),
+    UPPER_BACK("Upper back", MuscleGroup.BACK),
+    LOWER_BACK("Lower back", MuscleGroup.BACK),
+    TRAPS("Traps", MuscleGroup.TRAPS),
+    FRONT_DELT("Front delt", MuscleGroup.SHOULDERS),
+    MIDDLE_DELT("Middle delt", MuscleGroup.SHOULDERS),
+    REAR_DELT("Rear delt", MuscleGroup.SHOULDERS),
+    OBLIQUES("Obliques", MuscleGroup.ABS),
+    ABDOMINALS("Abdominals", MuscleGroup.ABS),
+    QUADS("Quads", MuscleGroup.QUADS),
+    HAMSTRINGS("Hamstrings", MuscleGroup.HAMSTRINGS),
+    ADDUCTORS("Adductors", MuscleGroup.GLUTES),
+    ABDUCTORS("Abductors", MuscleGroup.GLUTES),
+    GLUTES("Glutes", MuscleGroup.GLUTES),
+    CALVES("Calves", MuscleGroup.CALVES),
+    BICEPS_LONG("Biceps, long head", MuscleGroup.BICEPS),
+    BICEPS_SHORT("Biceps, short head", MuscleGroup.BICEPS),
+    TRICEPS_LONG("Triceps, long head", MuscleGroup.TRICEPS),
+    TRICEPS_LATERAL("Triceps, lateral head", MuscleGroup.TRICEPS),
+    TRICEPS_MEDIAL("Triceps, medial head", MuscleGroup.TRICEPS),
+    FOREARMS("Forearms", MuscleGroup.FOREARMS)
+}
+
+/**
  * What a strength goal is measured on.
  *
  * Two metrics rather than one because they answer different questions: an

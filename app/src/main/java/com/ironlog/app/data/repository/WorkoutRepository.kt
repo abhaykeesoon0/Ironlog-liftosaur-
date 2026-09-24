@@ -32,6 +32,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.ironlog.app.data.entity.RoutineExerciseEntity
 import com.ironlog.app.domain.usecase.Progression
+import com.ironlog.app.data.dao.ExerciseWorkRow
 
 /** What the logger needs to know after a set is ticked off. */
 data class SetCompletion(
@@ -84,6 +85,8 @@ interface WorkoutRepository {
     fun observeWorkout(id: String): Flow<WorkoutWithDetail?>
     fun observeHistory(limit: Int = 200): Flow<List<WorkoutWithDetail>>
     fun observeWorkoutDates(): Flow<List<Long>>
+    /** Per exercise per finished workout since [since]: muscles, working sets, volume. */
+    fun observeExerciseWork(since: Long): Flow<List<ExerciseWorkRow>>
     fun observeWorkoutCountSince(since: Long): Flow<Int>
     fun observeVolumeSince(since: Long): Flow<Double>
     fun observeDailyVolume(since: Long): Flow<List<VolumePoint>>
@@ -144,6 +147,9 @@ class WorkoutRepositoryImpl @Inject constructor(
 
     override fun observeWorkoutDates(): Flow<List<Long>> =
         currentUser.idOrNull()?.let { workoutDao.observeWorkoutDates(it) } ?: flowOf(emptyList())
+
+    override fun observeExerciseWork(since: Long): Flow<List<ExerciseWorkRow>> =
+        currentUser.idOrNull()?.let { workoutDao.observeExerciseWork(it, since) } ?: flowOf(emptyList())
 
     override fun observeWorkoutCountSince(since: Long): Flow<Int> =
         currentUser.idOrNull()?.let { workoutDao.observeWorkoutCountSince(it, since) } ?: flowOf(0)
