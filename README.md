@@ -33,9 +33,12 @@ and the cloud coach with the user's own API key).
 - **Strength goals** — a target weight or estimated 1RM per exercise, with
   progress on Home and a chart per goal.
 - **Coach** — an offline question-and-answer coach with a recovery model per
-  muscle. Optionally uses on-device Gemini Nano, or Claude in the cloud with
-  the user's own API key, or a keyless web lookup; all three are off unless
-  the user turns them on.
+  muscle. Four optional brains sit on top of it, every one off until the user
+  turns it on: a keyless web lookup for facts; on-device Gemini Nano where the
+  phone has it; a language model downloaded once from a public repository
+  (Qwen 2.5, 550 MB or 1.6 GB) and run on the handset by MediaPipe with no key
+  and no connection; and Claude in the cloud with the user's own API key. All
+  of them read the same brief: the user's own figures and the web extract.
 
 ### Body and cardio
 

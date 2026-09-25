@@ -3,6 +3,10 @@ package com.ironlog.app.ui.screens.coach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ironlog.app.core.ai.CloudAssistant
+import com.ironlog.app.core.ai.LocalAssistant
+import com.ironlog.app.core.ai.LocalModel
+import com.ironlog.app.core.ai.LocalModelState
+import com.ironlog.app.core.ai.LocalModelStore
 import com.ironlog.app.core.ai.OnDeviceAssistant
 import com.ironlog.app.data.repository.BodyRepository
 import com.ironlog.app.data.repository.ProfileRepository
@@ -39,6 +43,7 @@ data class CoachMessage(
 enum class CoachEngine(val label: String) {
     RULES("Built-in coach"),
     ON_DEVICE("Gemini Nano, on this phone"),
+    LOCAL("Model on this phone"),
     CLOUD("Claude"),
     WEB("Web lookup")
 }
@@ -55,6 +60,8 @@ data class CoachUiState(
     val cloudAvailable: Boolean = false,
     val useCloud: Boolean = false,
     val onDeviceAvailable: Boolean = false,
+    /** The downloaded model, if any, and how its download is going. */
+    val localModel: LocalModelState = LocalModelState(),
     /** Whether the coach may look the topic up online (keyless; only the topic leaves the phone). */
     val webLookups: Boolean = false,
     val error: String? = null
@@ -68,6 +75,8 @@ class CoachViewModel @Inject constructor(
     private val bodyRepository: BodyRepository,
     private val cloudAssistant: CloudAssistant,
     private val onDeviceAssistant: OnDeviceAssistant,
+    private val localAssistant: LocalAssistant,
+    private val localModels: LocalModelStore,
     private val webLookup: WebLookup
 ) : ViewModel() {
 
@@ -94,7 +103,38 @@ class CoachViewModel @Inject constructor(
         }
     }
 
+    init {
+        viewModelScope.launch {
+            localModels.state.collect { model -> _state.update { it.copy(localModel = model) } }
+        }
+    }
+
     fun setUseCloud(enabled: Boolean) = _state.update { it.copy(useCloud = enabled) }
+
+    // ------------------------------------------------------------ local model
+
+    /** Fetches [model] in the background; the screen follows the progress through [CoachUiState.localModel]. */
+    fun downloadModel(model: LocalModel, allowMetered: Boolean) {
+        viewModelScope.launch {
+            localModels.startDownload(model, allowMetered)
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not start the download")) } }
+        }
+    }
+
+    fun cancelModelDownload() {
+        viewModelScope.launch {
+            localModels.cancelDownload()
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not cancel the download")) } }
+        }
+    }
+
+    fun removeModel() {
+        viewModelScope.launch {
+            localAssistant.release()
+            localModels.remove()
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not remove the model")) } }
+        }
+    }
 
     fun setWebLookups(enabled: Boolean) {
         viewModelScope.launch {
@@ -137,6 +177,17 @@ class CoachViewModel @Inject constructor(
                     return@launch
                 }
                 // Fell through: the model was there a moment ago and is not now.
+            }
+
+            // The downloaded model: a real model on any phone, once fetched.
+            // Same brief, same footing as Nano; it simply runs from a file.
+            if (!_state.value.useCloud && _state.value.localModel.isReady) {
+                val local = localAssistant.ask(clean, brief)
+                if (local != null) {
+                    reply(CoachMessage(local, fromUser = false, source = withFact(CoachEngine.LOCAL.label, fact), url = fact?.url))
+                    return@launch
+                }
+                _state.update { it.copy(error = "The model on this phone could not answer; the built-in coach did.") }
             }
 
             if (_state.value.useCloud && _state.value.cloudAvailable) {

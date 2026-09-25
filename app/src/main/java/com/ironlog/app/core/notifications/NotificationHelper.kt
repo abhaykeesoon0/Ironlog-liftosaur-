@@ -66,7 +66,16 @@ class NotificationHelper @Inject constructor(
             setShowBadge(false)
         }
 
-        manager.createNotificationChannels(listOf(restTimer, reminders, cardio))
+        val downloads = NotificationChannel(
+            CHANNEL_DOWNLOADS,
+            context.getString(R.string.channel_downloads),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = context.getString(R.string.channel_downloads_desc)
+            setShowBadge(false)
+        }
+
+        manager.createNotificationChannels(listOf(restTimer, reminders, cardio, downloads))
     }
 
     private fun openAppIntent(route: String? = null): PendingIntent {
@@ -155,6 +164,21 @@ class NotificationHelper @Inject constructor(
             .build()
     }
 
+    /** The coach model coming down: a quiet, ongoing bar the download worker keeps updated. */
+    fun modelDownload(label: String, percent: Int): Notification =
+        NotificationCompat.Builder(context, CHANNEL_DOWNLOADS)
+            .setSmallIcon(R.drawable.ic_stat_timer)
+            .setContentTitle("Downloading the coach model")
+            .setContentText("$label · $percent%")
+            .setProgress(100, percent, percent == 0)
+            .setContentIntent(openAppIntent(ROUTE_COACH))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .build()
+
     /**
      * POST_NOTIFICATIONS may have been revoked between the permission check and
      * here, so the framework call is guarded rather than assumed to succeed.
@@ -185,6 +209,9 @@ class NotificationHelper @Inject constructor(
         const val ROUTE_ACTIVE_WORKOUT = "workout/active"
         const val ROUTE_ROUTINES = "routines"
         const val ROUTE_CARDIO = "cardio/track"
+        const val ROUTE_COACH = "coach"
+        const val CHANNEL_DOWNLOADS = "downloads"
+        const val ID_MODEL_DOWNLOAD = 1005
 
         fun formatClock(totalSeconds: Int): String {
             val safe = totalSeconds.coerceAtLeast(0)
