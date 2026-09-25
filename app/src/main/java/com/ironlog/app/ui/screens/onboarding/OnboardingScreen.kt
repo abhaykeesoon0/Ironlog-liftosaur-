@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -78,6 +79,9 @@ fun OnboardingScreen(onDone: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
+            // The app draws edge to edge. Without this the Skip button sits
+            // under the status bar, where the system takes the taps.
+            .safeDrawingPadding()
             .padding(Space.lg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

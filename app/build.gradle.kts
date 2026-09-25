@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -24,6 +26,25 @@ android {
         ksp { arg("room.schemaLocation", "$projectDir/schemas") }
     }
 
+    // The release key lives outside the repository: keystore.properties names
+    // the file and holds its passwords, and both are ignored by git. Without
+    // the file the release build still runs, unsigned, so a clone can be built
+    // without the key and only an installable release needs it.
+    val keystoreProperties = rootProject.file("keystore.properties")
+        .takeIf { it.exists() }
+        ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
+
+    signingConfigs {
+        if (keystoreProperties != null) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -32,6 +53,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (keystoreProperties != null) signingConfig = signingConfigs.getByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -49,6 +71,19 @@ android {
 
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
+    // One APK per CPU type, so a phone installs only the native libraries it
+    // can run: the SQLCipher, CameraX and ML Kit natives are three quarters of
+    // the release size and only one set of four is ever used. The universal
+    // APK is kept for a device whose architecture is not known in advance.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
     }
 
     buildFeatures {

@@ -22,6 +22,11 @@ captures/
 *.dex
 *.jks
 *.keystore
+# The release signing key and its passwords. Losing the key means no
+# installed copy can ever be updated, so back it up somewhere private;
+# committing it would hand the key to anyone with the repository.
+keystore/
+keystore.properties
 
 # Logs and OS clutter
 *.log
