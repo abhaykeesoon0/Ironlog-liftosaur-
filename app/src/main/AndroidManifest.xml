@@ -70,6 +70,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- The coach model download runs as WorkManager foreground work, so a
+         file of several hundred megabytes survives the user leaving the app. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Biometric app lock -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
@@ -158,6 +161,12 @@
         <receiver
             android:name=".core.notifications.NotificationActionReceiver"
             android:exported="false" />
+
+        <!-- WorkManager's own foreground service, told which kind of work it may carry. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
         <!-- Scoped sharing of captured photos and exported data files -->
         <provider

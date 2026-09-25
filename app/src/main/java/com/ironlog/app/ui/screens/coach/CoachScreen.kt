@@ -24,6 +24,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.ironlog.app.core.permissions.AppPermission
+import com.ironlog.app.core.permissions.rememberPermissionState
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
+import com.ironlog.app.core.ai.LocalModel
+import com.ironlog.app.core.ai.LocalModelState
+import com.ironlog.app.ui.components.IronCard
+import com.ironlog.app.ui.components.PrimaryButton
+import com.ironlog.app.ui.theme.ChalkFaint
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,6 +83,12 @@ fun CoachScreen(
     Column(Modifier.fillMaxSize().imePadding()) {
         IronTopBar(title = "Coach", onBack = onBack)
         ErrorBanner(state.error, Modifier.padding(horizontal = Space.lg))
+        LocalModelCard(
+            model = state.localModel,
+            onDownload = viewModel::downloadModel,
+            onCancel = viewModel::cancelModelDownload,
+            onRemove = viewModel::removeModel
+        )
 
         LazyColumn(
             state = listState,
@@ -123,7 +138,11 @@ fun CoachScreen(
             ) { viewModel.setWebLookups(!state.webLookups) }
             if (state.cloudAvailable) {
                 IronChip(
-                    text = if (state.useCloud) "Asking Claude" else "Built-in coach",
+                    text = when {
+                        state.useCloud -> "Asking Claude"
+                        state.localModel.isReady -> "Model on this phone"
+                        else -> "Built-in coach"
+                    },
                     selected = state.useCloud
                 ) { viewModel.setUseCloud(!state.useCloud) }
             }
@@ -191,6 +210,80 @@ private fun Bubble(message: CoachMessage) {
             message.source?.let {
                 Spacer(Modifier.height(Space.xs))
                 Caption("Source: $it")
+            }
+        }
+    }
+}
+
+/**
+ * The model that runs on the phone: offered, downloading, or ready.
+ *
+ * Kept to a few lines so the chat stays the point of the screen. The size is
+ * stated before the download and mobile data is off unless asked for, because
+ * a file this large should never be a surprise on a data plan.
+ */
+@Composable
+private fun LocalModelCard(
+    model: LocalModelState,
+    onDownload: (LocalModel, Boolean) -> Unit,
+    onCancel: () -> Unit,
+    onRemove: () -> Unit
+) {
+    var choice by remember { mutableStateOf(LocalModel.COMPACT) }
+    var allowMetered by remember { mutableStateOf(false) }
+    // The progress bar lives in a notification. Asked for with the reason
+    // first; a refusal still starts the download, just without the bar.
+    val notifications = rememberPermissionState(AppPermission.NOTIFICATIONS)
+    val start = { notifications.runWithPermission(onDenied = { onDownload(choice, allowMetered) }) { onDownload(choice, allowMetered) } }
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.lg, vertical = Space.xs)) {
+        when (model.status) {
+            LocalModelState.Status.READY -> Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Caption("Model on this phone: ${model.model?.label}. Answers without a key or a connection.", Modifier.weight(1f))
+                TextButton(onClick = onRemove) { Text("Remove", color = ChalkDim) }
+            }
+
+            LocalModelState.Status.DOWNLOADING -> Column {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Caption("Downloading ${model.model?.label} model · ${model.percent}%", Modifier.weight(1f))
+                    TextButton(onClick = onCancel) { Text("Cancel", color = ChalkDim) }
+                }
+                LinearProgressIndicator(
+                    progress = { model.percent / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Chalk,
+                    trackColor = ChalkFaint
+                )
+                model.error?.let { Caption(it, Modifier.padding(top = Space.xs)) }
+            }
+
+            LocalModelState.Status.NONE -> IronCard {
+                Column {
+                    Text("Answer with a model on this phone", style = MaterialTheme.typography.titleMedium, color = Chalk)
+                    Caption(
+                        "A real language model, downloaded once and run on the handset. No key, no account, and " +
+                            "nothing leaves the phone afterwards. It reads your figures and, when lookups are on, the web."
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+                        LocalModel.entries.forEach { option ->
+                            IronChip(text = "${option.label} · ${option.sizeLabel}", selected = choice == option) { choice = option }
+                        }
+                    }
+                    Caption(choice.blurb, Modifier.padding(top = Space.xs))
+                    Spacer(Modifier.height(Space.sm))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalAlignment = Alignment.CenterVertically) {
+                        IronChip(text = if (allowMetered) "Wi-Fi or mobile data" else "Wi-Fi only", selected = allowMetered) {
+                            allowMetered = !allowMetered
+                        }
+                    }
+                    model.error?.let { ErrorBanner(it, Modifier.padding(top = Space.sm)) }
+                    Spacer(Modifier.height(Space.md))
+                    PrimaryButton(text = "Download ${choice.sizeLabel}", onClick = start)
+                }
             }
         }
     }

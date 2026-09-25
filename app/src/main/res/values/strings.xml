@@ -8,4 +8,6 @@
     <string name="channel_reminders_desc">Nudges on days you planned to train</string>
     <string name="channel_cardio">Cardio tracking</string>
     <string name="channel_cardio_desc">Shows distance and pace while a route records</string>
+    <string name="channel_downloads">Downloads</string>
+    <string name="channel_downloads_desc">Progress of the coach model download</string>
 </resources>

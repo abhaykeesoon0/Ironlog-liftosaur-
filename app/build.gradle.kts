@@ -127,6 +127,8 @@ dependencies {
     implementation(libs.mlkit.genai.prompt)
     // Barcode scanning runs on the phone: the model ships with the app.
     implementation(libs.mlkit.barcode.scanning)
+    // Runs a downloaded language model on the phone for the coach. No network of its own.
+    implementation(libs.mediapipe.tasks.genai)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)

@@ -61,6 +61,8 @@ fun PrivacyScreen(onBack: () -> Unit) {
                 "Coach web lookups: the topic of your question goes to DuckDuckGo or Wikipedia. Never your log.",
                 "Cloud assistant: your question plus a few lines of your training figures go to Anthropic, with a key " +
                     "you supply. Off until you add one.",
+                "Coach model on this phone: if you choose to download one, the file comes from huggingface.co once and " +
+                    "is checked against its published checksum. After that the model answers on the phone and sends nothing.",
                 "Health Connect: sessions and meals are written to it only after you connect it, and you can revoke that.",
                 "Cloud copy of backups: if you choose a folder in a cloud storage app, each weekly backup is written " +
                     "there already sealed. The service only ever holds the encrypted file; the passphrase stays on the phone.",
