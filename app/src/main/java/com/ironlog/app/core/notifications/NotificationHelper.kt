@@ -1,5 +1,6 @@
 package com.ironlog.app.core.notifications
 
+import java.util.Locale
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -144,7 +145,7 @@ class NotificationHelper @Inject constructor(
         val km = distanceMeters / 1000.0
         return NotificationCompat.Builder(context, CHANNEL_CARDIO)
             .setSmallIcon(R.drawable.ic_stat_timer)
-            .setContentTitle(String.format("%.2f km · %s", km, formatClock(elapsedSeconds)))
+            .setContentTitle(String.format(Locale.getDefault(), "%.2f km · %s", km, formatClock(elapsedSeconds)))
             .setContentText("Average pace $paceLabel")
             .setContentIntent(openAppIntent(ROUTE_CARDIO))
             .setOngoing(true)

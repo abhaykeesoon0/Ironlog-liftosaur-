@@ -68,13 +68,9 @@ enum class AppPermission(
         title = "Connect to the strap",
         rationale = "Connecting reads beats per minute from the strap you chose, for this session only.",
         deniedConsequence = "Without it, the strap cannot be read. Cardio still records everything else."
-    ),
-    READ_IMAGES(
-        title = "Photos",
-        rationale = "Read access lets you choose an existing photo from your gallery as a progress shot or avatar, " +
-            "instead of taking a new one.",
-        deniedConsequence = "Without photo access you can only add images by taking a new one with the camera."
     );
+    // Choosing a gallery image goes through the system photo picker, which
+    // needs no permission of its own, so there is no entry for photo access.
 
     /**
      * The concrete manifest permission for the running OS version, or null when
@@ -96,12 +92,6 @@ enum class AppPermission(
                 else Manifest.permission.ACCESS_FINE_LOCATION
             BLUETOOTH_CONNECT ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_CONNECT else null
-            READ_IMAGES ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-                    Manifest.permission.READ_MEDIA_IMAGES
-                else if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2)
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                else null
         }
 
     fun isGranted(context: Context): Boolean {
