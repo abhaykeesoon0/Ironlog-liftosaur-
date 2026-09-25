@@ -280,7 +280,7 @@ class BackupRepositoryImpl @Inject constructor(
                 crypto.looksLikeBackup(head) -> IncomingKind.SEALED_BACKUP
                 // A JSON backup opens with a brace; anything else with a text
                 // header is treated as a CSV and left to the parser to reject.
-                head.decodeToString().trimStart('﻿', ' ', '\t', '\r', '\n').startsWith("{") -> IncomingKind.JSON_BACKUP
+                head.decodeToString().trimStart(BOM, ' ', '\t', '\r', '\n').startsWith("{") -> IncomingKind.JSON_BACKUP
                 else -> IncomingKind.CSV
             }
         }
@@ -501,6 +501,9 @@ class BackupRepositoryImpl @Inject constructor(
 
         /** Enough of a file to see past a byte-order mark and leading whitespace to its first token. */
         const val HEAD_BYTES = 64
+
+        /** The UTF-8 byte-order mark, built from its code point so no editor can turn it into an invisible literal. */
+        val BOM: Char = 0xFEFF.toChar()
 
         val KEY_AUTO_ON = booleanPreferencesKey("auto_backup_enabled")
         val KEY_AUTO_LAST_AT = longPreferencesKey("auto_backup_last_at")
