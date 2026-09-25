@@ -29,8 +29,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.ironlog.app.data.entity.MuscleTint
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import com.ironlog.app.data.repository.AutoBackupState
 import com.ironlog.app.data.repository.BackupRepository
+import com.ironlog.app.data.repository.IncomingKind
 import com.ironlog.app.data.repository.RestoreSummary
 import com.ironlog.app.data.repository.DEFAULT_LOCK_GRACE
 import com.ironlog.app.core.security.wipe
@@ -47,6 +49,8 @@ data class SettingsUiState(
     /** A backup file picked for restore, waiting on a passphrase or confirmation. */
     val restoreUri: Uri? = null,
     val restoreNeedsPassphrase: Boolean = false,
+    /** A Strong or Hevy export handed to the app, waiting for the user to say yes. */
+    val importUri: Uri? = null,
     val deleteError: String? = null,
     val error: String? = null,
     val message: String? = null
@@ -54,6 +58,7 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val profileRepository: ProfileRepository,
     private val cloudAssistant: CloudAssistant,
     private val exportRepository: ExportRepository,
@@ -89,8 +94,52 @@ class SettingsViewModel @Inject constructor(
     val autoBackup: StateFlow<AutoBackupState> = backupRepository.automatic
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AutoBackupState())
 
+    val screenshotsBlocked: StateFlow<Boolean> = profileRepository.screenshotsBlocked
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
+
+    init {
+        // A file shared into the app arrives as a route argument. It is taken
+        // once: a rotation must not offer the same import twice.
+        savedStateHandle.get<String>("file")?.let { raw ->
+            savedStateHandle["file"] = null
+            onIncomingFile(Uri.parse(raw))
+        }
+    }
+
+    /**
+     * Works out what a shared file is and opens the matching flow: the restore
+     * dialogs for a backup, a confirmation for a CSV. Nothing is written until
+     * the user says so.
+     */
+    fun onIncomingFile(uri: Uri) {
+        viewModelScope.launch {
+            backupRepository.classify(uri)
+                .onSuccess { kind ->
+                    _state.update {
+                        when (kind) {
+                            IncomingKind.SEALED_BACKUP -> it.copy(restoreUri = uri, restoreNeedsPassphrase = true)
+                            IncomingKind.JSON_BACKUP -> it.copy(restoreUri = uri, restoreNeedsPassphrase = false)
+                            IncomingKind.CSV -> it.copy(importUri = uri)
+                        }
+                    }
+                }
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not open that file")) } }
+        }
+    }
+
+    fun cancelImport() = _state.update { it.copy(importUri = null) }
+
+    fun confirmImport() {
+        val uri = _state.value.importUri ?: return
+        _state.update { it.copy(importUri = null) }
+        importCsv(uri)
+    }
+
+    fun setScreenshotsBlocked(blocked: Boolean) =
+        persist("Could not change the screenshot setting") { profileRepository.setScreenshotsBlocked(blocked) }
 
     val biometricAvailability: BiometricAvailability get() = biometricGate.availability()
 

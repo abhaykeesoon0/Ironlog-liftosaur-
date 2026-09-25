@@ -72,9 +72,15 @@ data class AutoBackupState(
     val hasLocalCopy: Boolean = false
 )
 
+/** What a file handed to the app turns out to be, decided from its first bytes. */
+enum class IncomingKind { SEALED_BACKUP, JSON_BACKUP, CSV }
+
 interface BackupRepository {
     /** The full backup, sealed under a passphrase the caller wipes afterwards. */
     suspend fun exportEncrypted(passphrase: CharArray): Result<File>
+
+    /** Which of the import paths a shared or opened file belongs on. */
+    suspend fun classify(uri: Uri): Result<IncomingKind>
 
     // ------------------------------------------------------------ automatic
 
@@ -265,6 +271,19 @@ class BackupRepositoryImpl @Inject constructor(
 
     override suspend fun isEncrypted(uri: Uri): Result<Boolean> = withContext(Dispatchers.IO) {
         runCatching { crypto.looksLikeBackup(readHead(uri)) }
+    }
+
+    override suspend fun classify(uri: Uri): Result<IncomingKind> = withContext(Dispatchers.IO) {
+        runCatching {
+            val head = readHead(uri, HEAD_BYTES)
+            when {
+                crypto.looksLikeBackup(head) -> IncomingKind.SEALED_BACKUP
+                // A JSON backup opens with a brace; anything else with a text
+                // header is treated as a CSV and left to the parser to reject.
+                head.decodeToString().trimStart('﻿', ' ', '\t', '\r', '\n').startsWith("{") -> IncomingKind.JSON_BACKUP
+                else -> IncomingKind.CSV
+            }
+        }
     }
 
     override suspend fun restore(uri: Uri, passphrase: CharArray?): Result<RestoreSummary> =
@@ -463,9 +482,9 @@ class BackupRepositoryImpl @Inject constructor(
             bytes
         } ?: throw UserFacingException("Could not open that file")
 
-    private fun readHead(uri: Uri): ByteArray =
+    private fun readHead(uri: Uri, bytes: Int = BackupCrypto.MAGIC.size + 1): ByteArray =
         context.contentResolver.openInputStream(uri)?.use { stream ->
-            val head = ByteArray(BackupCrypto.MAGIC.size + 1)
+            val head = ByteArray(bytes)
             val n = stream.read(head)
             head.copyOf(n.coerceAtLeast(0))
         } ?: throw UserFacingException("Could not open that file")
@@ -479,6 +498,9 @@ class BackupRepositoryImpl @Inject constructor(
 
         /** A month of weekly copies: enough to reach back past a bad week, small enough to forget about. */
         const val KEEP_COPIES = 4
+
+        /** Enough of a file to see past a byte-order mark and leading whitespace to its first token. */
+        const val HEAD_BYTES = 64
 
         val KEY_AUTO_ON = booleanPreferencesKey("auto_backup_enabled")
         val KEY_AUTO_LAST_AT = longPreferencesKey("auto_backup_last_at")

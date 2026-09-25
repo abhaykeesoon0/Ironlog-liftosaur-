@@ -53,6 +53,10 @@ class PhotosViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    /** Whether the whole app is already uncapturable, so this screen need not undo the flag on exit. */
+    val screenshotsBlocked: StateFlow<Boolean> = profileRepository.screenshotsBlocked
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     private val controls = MutableStateFlow(PhotoControls())
 
     val unit: StateFlow<UnitSystem> = profileRepository.observeUser()

@@ -110,6 +110,9 @@ interface ProfileRepository {
     suspend fun setTrainingFocus(focus: TrainingFocus): Result<Unit>
     /** How long the app may be in the background before the lock asks again. */
     val lockGraceSeconds: Flow<Int>
+    /** Whether every screen, not just the photos, refuses screenshots and recents thumbnails. */
+    val screenshotsBlocked: Flow<Boolean>
+    suspend fun setScreenshotsBlocked(blocked: Boolean): Result<Unit>
     /** Whether the introduction has been seen on this device. Device-level: there is no user yet. */
     val onboardingDone: Flow<Boolean>
     suspend fun setOnboardingDone(done: Boolean): Result<Unit>
@@ -176,6 +179,15 @@ class ProfileRepositoryImpl @Inject constructor(
     }
 
     override val lockGraceSeconds: Flow<Int> = dataStore.data.map { prefs -> prefs[KEY_LOCK_GRACE] ?: DEFAULT_LOCK_GRACE }
+
+    override val screenshotsBlocked: Flow<Boolean> = dataStore.data.map { prefs -> prefs[KEY_BLOCK_SCREENSHOTS] ?: false }
+
+    override suspend fun setScreenshotsBlocked(blocked: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            dataStore.edit { prefs -> prefs[KEY_BLOCK_SCREENSHOTS] = blocked }
+            Unit
+        }
+    }
 
     override suspend fun setLockGrace(seconds: Int): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -378,6 +390,7 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_TRAINING_FOCUS = stringPreferencesKey("training_focus")
         val KEY_HOME_SECTIONS = stringPreferencesKey("home_sections")
         val KEY_LOCK_GRACE = intPreferencesKey("lock_grace_seconds")
+        val KEY_BLOCK_SCREENSHOTS = booleanPreferencesKey("block_screenshots")
         val KEY_ONBOARDED = booleanPreferencesKey("onboarding_done")
         val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")
 

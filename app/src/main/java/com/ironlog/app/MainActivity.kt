@@ -1,7 +1,14 @@
 package com.ironlog.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.view.WindowManager
+import androidx.core.content.IntentCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.ironlog.app.ui.navigation.Routes
 import androidx.activity.compose.BackHandler
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -91,10 +98,22 @@ class MainActivity : FragmentActivity() {
         splash.setKeepOnScreenCondition { mainViewModel.sessionState.value is SessionState.Loading }
         enableEdgeToEdge()
         if (savedInstanceState == null) {
-            deepLinkRoute = intent?.getStringExtra(EXTRA_DEEP_LINK_ROUTE)
+            deepLinkRoute = intent?.getStringExtra(EXTRA_DEEP_LINK_ROUTE) ?: incomingFileRoute(intent)
             // Cold start only. A rotation is not an arrival, and neither is
             // coming back from the camera, so neither one greets the user again.
             mainViewModel.playWelcomeSound()
+        }
+
+        // Screenshots and the recents thumbnail follow one preference for the
+        // whole window. Applied here, at the root, so a screen that sets the
+        // flag for itself does not have to know about the setting.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.CREATED) {
+                mainViewModel.screenshotsBlocked.collect { blocked ->
+                    if (blocked) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
         }
 
         setContent {
@@ -120,7 +139,23 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.getStringExtra(EXTRA_DEEP_LINK_ROUTE)?.let { deepLinkRoute = it }
+        (intent.getStringExtra(EXTRA_DEEP_LINK_ROUTE) ?: incomingFileRoute(intent))?.let { deepLinkRoute = it }
+    }
+
+    /**
+     * A file shared or opened into the app -- a backup, or a Strong or Hevy
+     * export -- goes to the settings screen, which already knows how to ask
+     * what to do with it. The read grant on the URI lasts for this task, which
+     * is long enough for the user to confirm.
+     */
+    private fun incomingFileRoute(intent: Intent?): String? {
+        intent ?: return null
+        val uri: Uri? = when (intent.action) {
+            Intent.ACTION_SEND -> IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            Intent.ACTION_VIEW -> intent.data
+            else -> null
+        }
+        return uri?.let { Routes.settings(it) }
     }
 
     override fun onStart() {
@@ -272,6 +307,10 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     val sessionState: StateFlow<SessionState> = authRepository.sessionState
+
+    /** Eager, so the window flag is right before the first frame is drawn. */
+    val screenshotsBlocked: StateFlow<Boolean> = profileRepository.screenshotsBlocked
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** Null until the preference has been read, so the intro is neither flashed nor skipped by accident. */
     val needsOnboarding: StateFlow<Boolean?> = profileRepository.onboardingDone

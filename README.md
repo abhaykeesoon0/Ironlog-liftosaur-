@@ -56,7 +56,9 @@ and the cloud coach with the user's own API key).
 - **Home-screen widget** — this week's sessions, streak and today's food.
 - **Launcher shortcuts** — start training, log food, ask the coach.
 - **Health Connect** — reads steps, writes exercise, distance and nutrition.
-- **Import** — Strong and Hevy CSV exports, matched by exercise name.
+- **Import** — Strong and Hevy CSV exports, matched by exercise name. A
+  backup or CSV shared from another app, or opened from a file manager,
+  lands straight on the right import dialog.
 - **Export and backup** — CSV for workouts, measurements and cardio; a plain
   JSON backup; a passphrase-sealed encrypted backup for moving phones; and a
   weekly automatic encrypted backup kept in private storage, with a one-tap
@@ -79,6 +81,9 @@ and the cloud coach with the user's own API key).
   after a configurable grace period (15 s by default) in the background.
 - **Sign-in throttling** — five free attempts, then a back-off that starts at
   30 s and caps at 15 minutes.
+- **Screenshots** — the progress-photo screen is always uncapturable, and an
+  optional setting extends that to every screen, including the recents
+  thumbnail.
 - **Input** — every free-text field is sanitised before storage, and anything
   that can reach a CSV export is guarded against formula injection.
 - **Account deletion** requires the password and removes every row, photo,

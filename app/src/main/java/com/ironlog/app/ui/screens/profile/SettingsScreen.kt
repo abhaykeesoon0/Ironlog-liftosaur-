@@ -110,6 +110,7 @@ fun SettingsScreen(
     val notifications = rememberPermissionState(AppPermission.NOTIFICATIONS)
     var showDelete by remember { mutableStateOf(false) }
     val lockGrace by viewModel.lockGrace.collectAsStateWithLifecycle()
+    val screenshotsBlocked by viewModel.screenshotsBlocked.collectAsStateWithLifecycle()
     var askBackupPassphrase by remember { mutableStateOf(false) }
     val autoBackup by viewModel.autoBackup.collectAsStateWithLifecycle()
     var askAutoBackupPassphrase by remember { mutableStateOf(false) }
@@ -124,6 +125,17 @@ fun SettingsScreen(
             minLength = BackupCrypto.MIN_PASSPHRASE,
             onConfirm = { pass -> askAutoBackupPassphrase = false; viewModel.enableAutoBackup(pass) },
             onDismiss = { askAutoBackupPassphrase = false }
+        )
+    }
+    state.importUri?.let {
+        ConfirmDialog(
+            title = "Import this file?",
+            body = "It looks like a Strong or Hevy export. Its workouts are added to this account, matched to the " +
+                "library by exercise name. Nothing already here is changed.",
+            confirmLabel = "Import",
+            onConfirm = viewModel::confirmImport,
+            onDismiss = viewModel::cancelImport,
+            destructive = false
         )
     }
     if (confirmAutoRestore) {
@@ -540,6 +552,15 @@ fun SettingsScreen(
                         }
                         Caption("How long Liftosaur can be in the background before the lock asks again.", Modifier.padding(top = Space.xs))
                     }
+                    Hairline(Modifier.padding(vertical = Space.sm))
+                    // The photos screen is always uncapturable; this extends that
+                    // to the whole app, including the thumbnail in recents.
+                    SwitchRow(
+                        title = "Block screenshots",
+                        caption = "No screenshots, screen recording or recents preview of any screen. Photos are always protected.",
+                        checked = screenshotsBlocked,
+                        onCheckedChange = viewModel::setScreenshotsBlocked
+                    )
                     Hairline(Modifier.padding(vertical = Space.sm))
                     NavRow(Icons.Default.Key, "Change password", onChangePassword)
                 }
