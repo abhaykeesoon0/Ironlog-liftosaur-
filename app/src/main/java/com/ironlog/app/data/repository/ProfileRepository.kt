@@ -132,7 +132,8 @@ class ProfileRepositoryImpl @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val reminderScheduler: ReminderScheduler,
     private val authRepository: AuthRepository,
-    private val currentUser: CurrentUser
+    private val currentUser: CurrentUser,
+    private val backupRepository: BackupRepository
 ) : ProfileRepository {
 
     override fun observeUser(): Flow<UserEntity?> =
@@ -342,6 +343,8 @@ class ProfileRepositoryImpl @Inject constructor(
                 bodyDao.observePhotos(userId).first().forEach { photoStore.delete(it.filePath) }
                 user.avatarPath?.let { photoStore.delete(it) }
                 File(context.filesDir, "exports").listFiles()?.forEach { it.delete() }
+                // The weekly backup holds the same data under its own passphrase; both go.
+                backupRepository.disableAutomatic().getOrThrow()
 
                 exerciseDao.deleteOwnedBy(userId)
                 // Every other table cascades from users.

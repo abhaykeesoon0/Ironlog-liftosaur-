@@ -1,64 +1,153 @@
 # Liftosaur
 
 Android strength-training tracker built for a Mobile Application Development
-coursework assignment. (Formerly IronLog; the package `com.ironlog.app` and
-the `IronLog` log tag keep the original name.)
+coursework assignment. (Formerly IronLog; the package `com.ironlog.app`, the
+database, the preference files and the `IronLog` log tag keep the original
+name so existing installs and backups carry over.)
+
+The app is offline by design. There is no backend: accounts, tokens and the
+whole training log live on the phone, and the only network calls are the
+optional ones the user turns on (food lookup, the online exercise library,
+and the cloud coach with the user's own API key).
 
 ## Features
 
-- **Accounts & security** — registration and sign-in with PBKDF2 password hashing,
-  HMAC-signed session tokens in Keystore-backed encrypted storage with silent
-  refresh, optional biometric app lock (re-locks after 15 s in the background),
-  password change, and password-confirmed account deletion
-- **Routines** — build routines from a 70-movement library (plus custom
-  exercises) with sets, rep ranges and rest per exercise
-- **Workout logger** — previous-session values beside every set, warm-up/drop/
-  failure set types, live PR badges, foreground-service rest timer with
-  notification controls, accelerometer rep counter, plate calculator
-- **History** — every session with sets, volume, duration and records; deleting
-  a session rebuilds the affected personal records
-- **Progress** — weekly volume, muscle-group split, daily steps, records, and
-  per-exercise charts of top weight and estimated 1RM
-- **Body** — measurements with trend charts; progress photos from the camera or
-  photo picker, kept in private app storage only
-- **Outdoor cardio** — GPS route tracking in a foreground service with distance,
-  pace, elevation, steps and an estimated calorie figure
-- **Settings** — metric/imperial units, rest-timer defaults, weekly goal, daily
-  reminder (WorkManager), live permission status, CSV/JSON export via share sheet
+### Training
 
-### Device integration
+- **Routines** — build routines from a 200-movement library (plus custom
+  exercises) with sets, rep ranges, rest and a target weight per exercise.
+  Double progression moves the target up when a session earns it and back
+  when it clearly did not. A routine generator builds a plan from the
+  user's focus, days per week and equipment.
+- **Workout logger** — previous-session values beside every set, warm-up /
+  drop / failure set types, live PR badges, a plate calculator for the bar,
+  an accelerometer rep counter, spoken set entry ("100 kilos for 8"), and a
+  foreground-service rest timer with notification controls and a Quick
+  Settings tile. Repeat any past workout as a new one.
+- **History** — every session with sets, volume, duration and records;
+  deleting a session rebuilds the affected personal records. A session can
+  be shared as text or as a rendered image card.
+- **Progress** — weekly volume, muscle-group split, daily steps, records,
+  per-exercise charts of top weight and estimated 1RM, and a body map of
+  what was trained this week or any week before it.
+- **Strength goals** — a target weight or estimated 1RM per exercise, with
+  progress on Home and a chart per goal.
+- **Coach** — an offline question-and-answer coach with a recovery model per
+  muscle. Optionally uses on-device Gemini Nano, or Claude in the cloud with
+  the user's own API key, or a keyless web lookup; all three are off unless
+  the user turns them on.
 
-| Hardware | Used for |
+### Body and cardio
+
+- **Body** — measurements with trend charts; progress photos from the camera
+  or photo picker, kept in private app storage only, with a side-by-side
+  compare view. The photos screen blocks screenshots.
+- **Outdoor cardio** — GPS route tracking in a foreground service with
+  distance, pace, elevation, steps, an estimated calorie figure and, when a
+  Bluetooth LE heart-rate strap is paired, live and average heart rate.
+- **Nutrition** — a food log with a barcode scanner (on-device ML Kit, looked
+  up on Open Food Facts), daily targets, and a meal-plan generator.
+
+### Around the app
+
+- **Home** — a dashboard the user can reorder or hide section by section.
+- **Rewards** — quests that earn coins, and a store that spends them on
+  cosmetics.
+- **Home-screen widget** — this week's sessions, streak and today's food.
+- **Launcher shortcuts** — start training, log food, ask the coach.
+- **Health Connect** — reads steps, writes exercise, distance and nutrition.
+- **Import** — Strong and Hevy CSV exports, matched by exercise name.
+- **Export and backup** — CSV for workouts, measurements and cardio; a plain
+  JSON backup; a passphrase-sealed encrypted backup for moving phones; and a
+  weekly automatic encrypted backup kept in private storage, with a one-tap
+  restore of the latest copy.
+
+## Security
+
+- **Passwords** are hashed with PBKDF2-HMAC-SHA256 (120,000 iterations,
+  random salt) and compared in constant time. They travel through the app
+  as `CharArray` and are wiped after use.
+- **Sessions** are HMAC-SHA256 signed tokens: a 30-minute access token and a
+  30-day refresh token with silent refresh, stored in `EncryptedSharedPreferences`
+  under an Android Keystore master key.
+- **The database** is encrypted at rest with SQLCipher; a plaintext database
+  from an older install is migrated into the encrypted one on first launch.
+- **Backups** are sealed with AES-256-GCM under a PBKDF2-stretched passphrase,
+  with a fresh salt and nonce per file. The automatic weekly backup keeps its
+  passphrase in the same Keystore-encrypted store as the database key.
+- **App lock** — optional biometric or device-credential lock that re-locks
+  after a configurable grace period (15 s by default) in the background.
+- **Sign-in throttling** — five free attempts, then a back-off that starts at
+  30 s and caps at 15 minutes.
+- **Input** — every free-text field is sanitised before storage, and anything
+  that can reach a CSV export is guarded against formula injection.
+- **Account deletion** requires the password and removes every row, photo,
+  export and backup for the account.
+- Cloud backup and device transfer are disabled in the manifest, so health
+  data never leaves the handset unless the user exports it.
+
+## Device integration
+
+| Hardware or platform feature | Used for |
 |---|---|
-| Camera | Progress photos, avatar (FileProvider into private storage) |
+| Camera | Progress photos, avatar, barcode scanning |
 | GPS | Cardio route, distance, pace, elevation |
 | Accelerometer | Rep counting |
 | Step counter | Daily steps, in-session steps |
+| Microphone | Spoken set entry |
+| Bluetooth LE | Heart-rate strap during cardio |
 | Notifications | Rest timer, cardio status, daily reminder |
+| Quick Settings tile | Rest timer |
+| Home-screen widget | Weekly summary |
+| Health Connect | Steps in; exercise, distance and nutrition out |
+| WorkManager | Daily reminder, weekly automatic backup |
 | Biometrics | App lock |
 
-Every runtime permission shows an in-app rationale before the system dialog.
+Every runtime permission shows an in-app rationale before the system dialog,
+so a cold system prompt never causes a permanent denial.
 
 ## Running it
 
 1. Open the project folder in Android Studio (File > Open — do **not** use New Project)
 2. Let Gradle sync; it will download the Android and Compose dependencies
-3. Run on a **physical device**. The emulator has no step counter and a stubbed
-   accelerometer, so the rep counter and daily step features will not work there.
+3. Run on a **physical device** for the full experience. The emulator has no
+   step counter, a stubbed accelerometer and no Bluetooth, so the rep counter,
+   daily steps and heart-rate strap will not work there.
 
 Requires JDK 17 and Android SDK 35. minSdk 26.
+
+```bash
+./gradlew assembleDebug          # build
+./gradlew installDebug           # install on a connected device or emulator
+adb logcat -s IronLog:V          # app logs
+```
+
+The debug build installs as `com.ironlog.app.debug`, so it can sit beside a
+release install.
 
 ## Architecture
 
 MVVM throughout: Composable screen → ViewModel → Repository → DAO → Room.
-Hilt provides dependencies. See `CLAUDE.md` for the conventions the codebase
-follows.
+Hilt provides dependencies. Every repository method returns a `Result`, and
+ViewModels turn failures into user-facing messages; nothing is silently
+swallowed. Weights are stored in kilograms and converted for display only.
+See `CLAUDE.md` for the conventions the codebase follows.
 
 ## Tests
 
 ```bash
-./gradlew testDebugUnitTest
+./gradlew testDebugUnitTest          # JVM unit tests
+./gradlew connectedDebugAndroidTest  # instrumented tests, needs a device or emulator
 ```
 
 Unit tests cover the training maths (1RM, volume, progression, plate loading,
-streaks), input validation and CSV-injection guarding, and GPS maths.
+streaks), PR detection rules, goal maths, the recovery and prediction models,
+the routine and meal-plan generators, the spoken-set parser, CSV import,
+input validation and CSV-injection guarding, GPS maths, and a ViewModel
+driven through a faked repository.
+
+Instrumented tests cover every database migration from version 1, the DAO
+aggregate queries (including the rule that warm-up sets never count), the
+workout repository from start to finish with real PR detection, and the app
+as a new user meets it: introduction, account creation, Home, and the
+privacy page.

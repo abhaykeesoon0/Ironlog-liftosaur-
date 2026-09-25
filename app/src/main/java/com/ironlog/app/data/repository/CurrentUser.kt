@@ -12,12 +12,12 @@ import javax.inject.Singleton
  * every repository immediately stops being able to read or write user data.
  */
 @Singleton
-class CurrentUser @Inject constructor(
+open class CurrentUser @Inject constructor(
     private val tokenStore: SecureTokenStore
 ) {
-    fun idOrNull(): String? = tokenStore.userId()
+    open fun idOrNull(): String? = tokenStore.userId()
 
-    fun require(): String = tokenStore.userId() ?: throw NotSignedInException()
+    open fun require(): String = tokenStore.userId() ?: throw NotSignedInException()
 }
 
 class NotSignedInException : IllegalStateException("You've been signed out. Sign in again to continue.")
