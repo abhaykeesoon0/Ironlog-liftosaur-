@@ -130,6 +130,23 @@ adb logcat -s IronLog:V          # app logs
 The debug build installs as `com.ironlog.app.debug`, so it can sit beside a
 release install.
 
+### Release build
+
+```bash
+./gradlew assembleRelease
+```
+
+Produces one signed, shrunk APK per CPU architecture under
+`app/build/outputs/apk/release/`, plus a universal one. Install the
+`arm64-v8a` APK on any modern phone (about 22 MB); the universal APK
+(about 52 MB) works on anything.
+
+Signing reads `keystore.properties` in the project root, which names the
+keystore file and holds its passwords. Both are ignored by git. Without the
+file the release build still runs but produces an unsigned APK that a phone
+will refuse to install. Keep a private copy of the keystore: an APK signed
+with a different key cannot update an existing install.
+
 ## Architecture
 
 MVVM throughout: Composable screen → ViewModel → Repository → DAO → Room.

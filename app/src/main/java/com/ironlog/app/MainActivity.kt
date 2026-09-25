@@ -3,6 +3,7 @@ package com.ironlog.app
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.WindowManager
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.Lifecycle
@@ -318,7 +319,13 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun finishOnboarding() {
-        viewModelScope.launch { profileRepository.setOnboardingDone(true) }
+        viewModelScope.launch {
+            profileRepository.setOnboardingDone(true).onFailure {
+                // There is no screen to tell: the introduction simply stays. The
+                // cause must reach logcat, or a failure here is invisible.
+                Log.e("IronLog", "Could not record that the introduction was seen", it)
+            }
+        }
     }
 
     private var backgroundedAt: Long? = null
