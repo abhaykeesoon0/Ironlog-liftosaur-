@@ -29,7 +29,9 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.ironlog.app.data.entity.MuscleTint
 import android.net.Uri
+import com.ironlog.app.data.repository.AutoBackupState
 import com.ironlog.app.data.repository.BackupRepository
+import com.ironlog.app.data.repository.RestoreSummary
 import com.ironlog.app.data.repository.DEFAULT_LOCK_GRACE
 import com.ironlog.app.core.security.wipe
 import com.ironlog.app.core.widget.WidgetSummary
@@ -83,6 +85,9 @@ class SettingsViewModel @Inject constructor(
 
     val lockGrace: StateFlow<Int> = profileRepository.lockGraceSeconds
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DEFAULT_LOCK_GRACE)
+
+    val autoBackup: StateFlow<AutoBackupState> = backupRepository.automatic
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AutoBackupState())
 
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
@@ -220,6 +225,53 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // ------------------------------------------------------------ automatic backup
+
+    /** Turns the weekly backup on under [passphrase]; the repository wipes the array. */
+    fun enableAutoBackup(passphrase: CharArray) {
+        viewModelScope.launch {
+            backupRepository.enableAutomatic(passphrase)
+                .onSuccess { _state.update { it.copy(message = "Weekly backup is on. The first one is being made now.") } }
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not turn on automatic backups")) } }
+        }
+    }
+
+    fun disableAutoBackup() {
+        viewModelScope.launch {
+            backupRepository.disableAutomatic()
+                .onSuccess { _state.update { it.copy(message = "Weekly backup is off. The local copies were deleted.") } }
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not turn off automatic backups")) } }
+        }
+    }
+
+    /** Writes a backup right now, in the foreground, so the user sees it land. */
+    fun backupNow() {
+        if (_state.value.isBackingUp) return
+        _state.update { it.copy(isBackingUp = true, error = null) }
+        viewModelScope.launch {
+            backupRepository.writeAutomaticBackup()
+                .onSuccess { _state.update { it.copy(isBackingUp = false, message = "Backup saved to this phone.") } }
+                .onFailure { e -> _state.update { it.copy(isBackingUp = false, error = e.userMessage("Backup failed. Try again.")) } }
+        }
+    }
+
+    fun restoreLatestAutomatic() {
+        if (_state.value.isRestoring) return
+        _state.update { it.copy(isRestoring = true, error = null) }
+        viewModelScope.launch {
+            backupRepository.restoreLatestAutomatic()
+                .onSuccess { summary -> _state.update { it.copy(isRestoring = false, message = restoreMessage(summary)) } }
+                .onFailure { e -> _state.update { it.copy(isRestoring = false, error = e.userMessage("Restore failed")) } }
+        }
+    }
+
+    private fun restoreMessage(summary: RestoreSummary): String =
+        if (summary.isEmpty) "Nothing new in that backup" +
+            (if (summary.skipped > 0) ": ${summary.skipped} entries were already here." else ".")
+        else "Restored ${summary.workouts} workouts, ${summary.routines} routines, " +
+            "${summary.measurements} measurements and ${summary.cardio} cardio sessions" +
+            (if (summary.skipped > 0) "; ${summary.skipped} already here." else ".")
+
     /** A file was chosen: find out whether it needs a passphrase before asking for one. */
     fun onRestoreFileChosen(uri: Uri) {
         viewModelScope.launch {
@@ -259,14 +311,7 @@ class SettingsViewModel @Inject constructor(
             backupRepository.restore(uri, passphrase)
                 .onSuccess { summary ->
                     _state.update {
-                        it.copy(
-                            isRestoring = false, restoreUri = null, restoreNeedsPassphrase = false,
-                            message = if (summary.isEmpty) "Nothing new in that backup" +
-                                (if (summary.skipped > 0) ": ${summary.skipped} entries were already here." else ".")
-                            else "Restored ${summary.workouts} workouts, ${summary.routines} routines, " +
-                                "${summary.measurements} measurements and ${summary.cardio} cardio sessions" +
-                                (if (summary.skipped > 0) "; ${summary.skipped} already here." else ".")
-                        )
+                        it.copy(isRestoring = false, restoreUri = null, restoreNeedsPassphrase = false, message = restoreMessage(summary))
                     }
                 }
                 .onFailure { e -> _state.update { it.copy(isRestoring = false, error = e.userMessage("Restore failed")) } }
@@ -294,6 +339,8 @@ class SettingsViewModel @Inject constructor(
     fun clearDeleteError() = _state.update { it.copy(deleteError = null) }
 
     fun dismissError() = _state.update { it.copy(error = null) }
+
+    fun dismissMessage() = _state.update { it.copy(message = null) }
 
     private fun persist(fallback: String, block: suspend () -> Result<Unit>) {
         viewModelScope.launch {

@@ -35,6 +35,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.ironlog.app.core.security.wipe
 import com.ironlog.app.core.media.CsvImport
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.ironlog.app.core.backup.AutoBackupScheduler
+import com.ironlog.app.core.security.SecureTokenStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /** What a restore brought in, so the user is told rather than left to look. */
 data class RestoreSummary(
@@ -48,9 +61,41 @@ data class RestoreSummary(
     val isEmpty: Boolean get() = workouts + routines + measurements + cardio == 0
 }
 
+/** Where the weekly backup stands, for the settings screen. */
+data class AutoBackupState(
+    val enabled: Boolean = false,
+    /** When the last automatic backup was written, or null if none has been yet. */
+    val lastBackupAt: Long? = null,
+    /** Why the last attempt failed, cleared by the next success. */
+    val lastError: String? = null,
+    /** Whether there is a local copy that could be restored. */
+    val hasLocalCopy: Boolean = false
+)
+
 interface BackupRepository {
     /** The full backup, sealed under a passphrase the caller wipes afterwards. */
     suspend fun exportEncrypted(passphrase: CharArray): Result<File>
+
+    // ------------------------------------------------------------ automatic
+
+    val automatic: Flow<AutoBackupState>
+
+    /**
+     * Turns the weekly backup on. The passphrase is kept in keystore-encrypted
+     * storage so the scheduled run can seal the file without anyone present;
+     * the array is wiped whatever the outcome. The first backup is made right
+     * away rather than a week from now.
+     */
+    suspend fun enableAutomatic(passphrase: CharArray): Result<Unit>
+
+    /** Turns it off, forgets the passphrase and deletes the local copies. */
+    suspend fun disableAutomatic(): Result<Unit>
+
+    /** Writes one sealed backup into private storage. Called by the worker, and by "back up now". */
+    suspend fun writeAutomaticBackup(): Result<File>
+
+    /** Restores the newest local copy with the stored passphrase. */
+    suspend fun restoreLatestAutomatic(): Result<RestoreSummary>
 
     /** Whether a chosen file is sealed, so the screen knows to ask for a passphrase. */
     suspend fun isEncrypted(uri: Uri): Result<Boolean>
@@ -79,10 +124,111 @@ class BackupRepositoryImpl @Inject constructor(
     private val routineDao: RoutineDao,
     private val bodyDao: BodyDao,
     private val cardioDao: CardioDao,
-    private val currentUser: CurrentUser
+    private val currentUser: CurrentUser,
+    private val dataStore: DataStore<Preferences>,
+    private val tokenStore: SecureTokenStore,
+    private val scheduler: AutoBackupScheduler
 ) : BackupRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    /**
+     * Separate from the exports folder: that one is pruned to the last few
+     * files the user shared, and a weekly backup should neither push those out
+     * nor be pushed out by them.
+     */
+    private val autoDir: File
+        get() = File(context.filesDir, "backups").apply { if (!exists()) mkdirs() }
+
+    private fun localCopies(): List<File> =
+        autoDir.listFiles { f -> f.isFile && f.name.endsWith(".liftosaur") }
+            ?.sortedByDescending { it.lastModified() }
+            .orEmpty()
+
+    override val automatic: Flow<AutoBackupState> = dataStore.data.map { prefs ->
+        AutoBackupState(
+            enabled = prefs[KEY_AUTO_ON] ?: false,
+            lastBackupAt = prefs[KEY_AUTO_LAST_AT],
+            lastError = prefs[KEY_AUTO_LAST_ERROR],
+            hasLocalCopy = localCopies().isNotEmpty()
+        )
+    }
+
+    override suspend fun enableAutomatic(passphrase: CharArray): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            runCatching {
+                currentUser.require()
+                if (passphrase.size < BackupCrypto.MIN_PASSPHRASE) {
+                    throw UserFacingException("Use a passphrase of at least ${BackupCrypto.MIN_PASSPHRASE} characters")
+                }
+                tokenStore.saveBackupPassphrase(passphrase)
+                dataStore.edit { prefs ->
+                    prefs[KEY_AUTO_ON] = true
+                    prefs.remove(KEY_AUTO_LAST_ERROR)
+                }
+                scheduler.schedule()
+                scheduler.runNow()
+            }
+        } finally {
+            passphrase.wipe()
+        }
+    }
+
+    override suspend fun disableAutomatic(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            scheduler.cancel()
+            tokenStore.saveBackupPassphrase(null)
+            localCopies().forEach { it.delete() }
+            dataStore.edit { prefs ->
+                prefs[KEY_AUTO_ON] = false
+                prefs.remove(KEY_AUTO_LAST_AT)
+                prefs.remove(KEY_AUTO_LAST_ERROR)
+            }
+            Unit
+        }
+    }
+
+    override suspend fun writeAutomaticBackup(): Result<File> = withContext(Dispatchers.IO) {
+        val passphrase = tokenStore.backupPassphrase()
+        try {
+            runCatching {
+                if (passphrase == null) throw UserFacingException("Automatic backups are not set up")
+                val userId = currentUser.require()
+                val payload = exportRepository.backupJson(userId).getOrThrow()
+                val sealed = crypto.encrypt(payload.toByteArray(Charsets.UTF_8), passphrase)
+                val file = File(autoDir, "liftosaur_auto_${fileStamp.format(Instant.now())}.liftosaur")
+                file.writeBytes(sealed)
+                localCopies().drop(KEEP_COPIES).forEach { it.delete() }
+                dataStore.edit { prefs ->
+                    prefs[KEY_AUTO_LAST_AT] = System.currentTimeMillis()
+                    prefs.remove(KEY_AUTO_LAST_ERROR)
+                }
+                file
+            }.onFailure { e ->
+                // The record of the failure is what the settings screen shows;
+                // the failure itself still goes back to the caller.
+                if (e !is NotSignedInException) {
+                    runCatching {
+                        dataStore.edit { prefs -> prefs[KEY_AUTO_LAST_ERROR] = e.userMessage("The last backup failed") }
+                    }
+                }
+            }
+        } finally {
+            passphrase?.wipe()
+        }
+    }
+
+    override suspend fun restoreLatestAutomatic(): Result<RestoreSummary> = withContext(Dispatchers.IO) {
+        val passphrase = tokenStore.backupPassphrase()
+            ?: return@withContext Result.failure(UserFacingException("Automatic backups are not set up"))
+        val latest = localCopies().firstOrNull()
+            ?: run {
+                passphrase.wipe()
+                return@withContext Result.failure(UserFacingException("No automatic backup has been made yet"))
+            }
+        // restore() wipes the passphrase it is given.
+        restore(Uri.fromFile(latest), passphrase)
+    }
 
     override suspend fun exportEncrypted(passphrase: CharArray): Result<File> = withContext(Dispatchers.IO) {
         try {
@@ -324,8 +470,18 @@ class BackupRepositoryImpl @Inject constructor(
             head.copyOf(n.coerceAtLeast(0))
         } ?: throw UserFacingException("Could not open that file")
 
+    private val fileStamp: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmm").withZone(ZoneId.systemDefault())
+
     private companion object {
         /** A log is text; a hundred megabytes of it is not a backup. */
         const val MAX_BACKUP_BYTES = 100L * 1024 * 1024
+
+        /** A month of weekly copies: enough to reach back past a bad week, small enough to forget about. */
+        const val KEEP_COPIES = 4
+
+        val KEY_AUTO_ON = booleanPreferencesKey("auto_backup_enabled")
+        val KEY_AUTO_LAST_AT = longPreferencesKey("auto_backup_last_at")
+        val KEY_AUTO_LAST_ERROR = stringPreferencesKey("auto_backup_last_error")
     }
 }

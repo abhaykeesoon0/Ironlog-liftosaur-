@@ -113,6 +113,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
+    // ViewModel tests drive viewModelScope on a test dispatcher.
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)
     // Every migration is walked from version 1 against the exported schemas.

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -78,6 +81,10 @@ import com.ironlog.app.core.security.BackupCrypto
 import com.ironlog.app.data.repository.LOCK_GRACE_OPTIONS
 import com.ironlog.app.ui.components.ConfirmDialog
 import com.ironlog.app.ui.components.PassphraseDialog
+import com.ironlog.app.data.repository.AutoBackupState
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import androidx.compose.material.icons.filled.Info
 import com.ironlog.app.data.entity.TrainingFocus
 
@@ -104,6 +111,32 @@ fun SettingsScreen(
     var showDelete by remember { mutableStateOf(false) }
     val lockGrace by viewModel.lockGrace.collectAsStateWithLifecycle()
     var askBackupPassphrase by remember { mutableStateOf(false) }
+    val autoBackup by viewModel.autoBackup.collectAsStateWithLifecycle()
+    var askAutoBackupPassphrase by remember { mutableStateOf(false) }
+    var confirmAutoRestore by remember { mutableStateOf(false) }
+    if (askAutoBackupPassphrase) {
+        PassphraseDialog(
+            title = "Turn on weekly backup",
+            body = "Choose a passphrase of at least ${BackupCrypto.MIN_PASSPHRASE} characters. It is kept in this phone's " +
+                "encrypted storage so backups can be sealed while you are not looking, and you will need it to open " +
+                "one on another phone.",
+            confirmLabel = "Turn on",
+            minLength = BackupCrypto.MIN_PASSPHRASE,
+            onConfirm = { pass -> askAutoBackupPassphrase = false; viewModel.enableAutoBackup(pass) },
+            onDismiss = { askAutoBackupPassphrase = false }
+        )
+    }
+    if (confirmAutoRestore) {
+        ConfirmDialog(
+            title = "Restore the latest backup?",
+            body = "Workouts, routines, measurements and cardio in the newest local copy are added to this account. " +
+                "Nothing already here is changed.",
+            confirmLabel = "Restore",
+            onConfirm = { confirmAutoRestore = false; viewModel.restoreLatestAutomatic() },
+            onDismiss = { confirmAutoRestore = false },
+            destructive = false
+        )
+    }
     val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::onRestoreFileChosen)
     }
@@ -156,6 +189,18 @@ fun SettingsScreen(
             .onFailure { viewModel.onShareFailed() }
     }
 
+    // Outcomes of the data actions -- an import, a restore, a backup -- are
+    // one-shot notices, shown where the user is looking rather than at the
+    // top of a long page they have scrolled away from.
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(state.message) {
+        state.message?.let { text ->
+            snackbar.showSnackbar(text)
+            viewModel.dismissMessage()
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         IronTopBar(title = "Settings", onBack = onBack)
         Column(
@@ -556,6 +601,39 @@ fun SettingsScreen(
                             "Liftosaur. Restoring adds what is missing and leaves what is already here.",
                         Modifier.padding(top = Space.xs)
                     )
+                    Hairline(Modifier.padding(vertical = Space.sm))
+                    // The weekly copy: the one backup that exists without the user
+                    // remembering to make it.
+                    SwitchRow(
+                        title = "Weekly automatic backup",
+                        checked = autoBackup.enabled,
+                        onCheckedChange = { on ->
+                            if (on) askAutoBackupPassphrase = true else viewModel.disableAutoBackup()
+                        },
+                        caption = autoBackupCaption(autoBackup),
+                        enabled = !state.isBackingUp && !state.isRestoring
+                    )
+                    if (autoBackup.enabled) {
+                        ExportRow(
+                            label = "Back up now",
+                            busy = state.isBackingUp,
+                            enabled = !state.isBackingUp && !state.isRestoring,
+                            onClick = viewModel::backupNow
+                        )
+                        if (autoBackup.hasLocalCopy) {
+                            ExportRow(
+                                label = "Restore the latest automatic backup",
+                                busy = state.isRestoring,
+                                enabled = !state.isBackingUp && !state.isRestoring,
+                                onClick = { confirmAutoRestore = true }
+                            )
+                        }
+                        Caption(
+                            "Sealed copies stay in Liftosaur's private storage on this phone; the last four are kept. " +
+                                "Turning this off deletes them and forgets the passphrase.",
+                            Modifier.padding(top = Space.xs)
+                        )
+                    }
                 }
             }
 
@@ -569,6 +647,8 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(Space.section))
         }
+    }
+    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(Space.lg))
     }
 
     if (showDelete) {
@@ -598,6 +678,16 @@ private fun PermissionRow(title: String, granted: Boolean, rationale: String) {
             color = if (granted) Chalk else ChalkFaint
         )
     }
+}
+
+/** One line under the switch: when the last copy was made, or why it was not. */
+private fun autoBackupCaption(state: AutoBackupState): String = when {
+    !state.enabled -> "A sealed copy of your log, made every week and kept on this phone."
+    state.lastError != null -> state.lastError
+    state.lastBackupAt == null -> "The first backup is on its way."
+    else -> "Last backup " + DateTimeFormatter.ofPattern("d MMM, HH:mm")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(state.lastBackupAt))
 }
 
 @Composable

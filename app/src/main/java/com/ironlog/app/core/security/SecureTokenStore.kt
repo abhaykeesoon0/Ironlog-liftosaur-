@@ -91,6 +91,24 @@ class SecureTokenStore @Inject constructor(
         prefs.edit().putString(KEY_DATABASE, value).apply()
     }
 
+    /**
+     * The passphrase automatic backups are sealed with, once the user has
+     * turned them on.
+     *
+     * A scheduled backup runs with nobody there to type a passphrase, so the
+     * app has to hold one. It sits in this keystore-encrypted file, beside the
+     * database key it protects the same data with, and never in DataStore. The
+     * copy handed out is a fresh array for the caller to wipe; the preference
+     * itself is removed when automatic backups are turned off.
+     */
+    fun backupPassphrase(): CharArray? = prefs.getString(KEY_BACKUP_PASSPHRASE, null)?.toCharArray()
+
+    fun saveBackupPassphrase(value: CharArray?) {
+        prefs.edit().apply {
+            if (value == null) remove(KEY_BACKUP_PASSPHRASE) else putString(KEY_BACKUP_PASSPHRASE, String(value))
+        }.apply()
+    }
+
     /** Failures and the lock deadline for one account, keyed by a hash of the email. */
     fun loginThrottle(key: String): Pair<Int, Long> =
         prefs.getInt("throttle_f_$key", 0) to prefs.getLong("throttle_u_$key", 0L)
@@ -117,5 +135,6 @@ class SecureTokenStore @Inject constructor(
         const val KEY_ACCESS_EXPIRY = "access_expiry"
         const val KEY_SIGNING_SECRET = "signing_secret"
         const val KEY_ASSISTANT = "assistant_api_key"
+        const val KEY_BACKUP_PASSPHRASE = "auto_backup_passphrase"
     }
 }

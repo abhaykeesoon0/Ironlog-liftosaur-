@@ -25,6 +25,9 @@ enum class ExportKind(val label: String, val mimeType: String) {
 interface ExportRepository {
     suspend fun export(kind: ExportKind): Result<File>
     fun shareIntent(file: File, kind: ExportKind): Intent
+
+    /** The full backup as JSON text, for a caller that will seal or store it itself. */
+    suspend fun backupJson(userId: String): Result<String>
 }
 
 @Singleton
@@ -53,6 +56,10 @@ class ExportRepositoryImpl @Inject constructor(
     }
 
     override fun shareIntent(file: File, kind: ExportKind): Intent = exporter.share(file, kind.mimeType)
+
+    override suspend fun backupJson(userId: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching { json.encodeToString(Backup.serializer(), backup(userId)) }
+    }
 
     private suspend fun backup(userId: String): Backup = Backup(
         exportedAt = System.currentTimeMillis(),
