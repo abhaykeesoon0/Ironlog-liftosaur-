@@ -42,6 +42,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ironlog.app.core.backup.AutoBackupScheduler
+import com.ironlog.app.core.backup.CloudFolder
 import com.ironlog.app.core.security.SecureTokenStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -69,7 +70,12 @@ data class AutoBackupState(
     /** Why the last attempt failed, cleared by the next success. */
     val lastError: String? = null,
     /** Whether there is a local copy that could be restored. */
-    val hasLocalCopy: Boolean = false
+    val hasLocalCopy: Boolean = false,
+    /** The cloud folder each backup is also written to, by name, or null when none is chosen. */
+    val cloudFolderName: String? = null,
+    val lastCloudBackupAt: Long? = null,
+    /** Why the last cloud copy failed while the local one succeeded. */
+    val lastCloudError: String? = null
 )
 
 /** What a file handed to the app turns out to be, decided from its first bytes. */
@@ -103,6 +109,20 @@ interface BackupRepository {
     /** Restores the newest local copy with the stored passphrase. */
     suspend fun restoreLatestAutomatic(): Result<RestoreSummary>
 
+    // ------------------------------------------------------------ cloud copy
+
+    /**
+     * Keeps a copy of every automatic backup in a folder the user chose in a
+     * cloud storage app. The grant is taken here and held until cleared.
+     */
+    suspend fun setCloudFolder(treeUri: Uri): Result<Unit>
+
+    /** Stops copying and gives the grant back. Files already in the folder are left alone. */
+    suspend fun clearCloudFolder(): Result<Unit>
+
+    /** Restores the newest sealed copy found in the cloud folder, with the stored passphrase. */
+    suspend fun restoreLatestCloud(): Result<RestoreSummary>
+
     /** Whether a chosen file is sealed, so the screen knows to ask for a passphrase. */
     suspend fun isEncrypted(uri: Uri): Result<Boolean>
 
@@ -133,7 +153,8 @@ class BackupRepositoryImpl @Inject constructor(
     private val currentUser: CurrentUser,
     private val dataStore: DataStore<Preferences>,
     private val tokenStore: SecureTokenStore,
-    private val scheduler: AutoBackupScheduler
+    private val scheduler: AutoBackupScheduler,
+    private val cloud: CloudFolder
 ) : BackupRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -156,9 +177,14 @@ class BackupRepositoryImpl @Inject constructor(
             enabled = prefs[KEY_AUTO_ON] ?: false,
             lastBackupAt = prefs[KEY_AUTO_LAST_AT],
             lastError = prefs[KEY_AUTO_LAST_ERROR],
-            hasLocalCopy = localCopies().isNotEmpty()
+            hasLocalCopy = localCopies().isNotEmpty(),
+            cloudFolderName = prefs[KEY_CLOUD_URI]?.let { prefs[KEY_CLOUD_NAME] ?: "Cloud folder" },
+            lastCloudBackupAt = prefs[KEY_CLOUD_LAST_AT],
+            lastCloudError = prefs[KEY_CLOUD_LAST_ERROR]
         )
     }
+
+    private suspend fun cloudTree(): Uri? = dataStore.data.first()[KEY_CLOUD_URI]?.let(Uri::parse)
 
     override suspend fun enableAutomatic(passphrase: CharArray): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -185,6 +211,7 @@ class BackupRepositoryImpl @Inject constructor(
             scheduler.cancel()
             tokenStore.saveBackupPassphrase(null)
             localCopies().forEach { it.delete() }
+            clearCloudFolder().getOrThrow()
             dataStore.edit { prefs ->
                 prefs[KEY_AUTO_ON] = false
                 prefs.remove(KEY_AUTO_LAST_AT)
@@ -202,13 +229,15 @@ class BackupRepositoryImpl @Inject constructor(
                 val userId = currentUser.require()
                 val payload = exportRepository.backupJson(userId).getOrThrow()
                 val sealed = crypto.encrypt(payload.toByteArray(Charsets.UTF_8), passphrase)
-                val file = File(autoDir, "liftosaur_auto_${fileStamp.format(Instant.now())}.liftosaur")
+                val name = "${CloudFolder.PREFIX}${fileStamp.format(Instant.now())}${CloudFolder.SUFFIX}"
+                val file = File(autoDir, name)
                 file.writeBytes(sealed)
                 localCopies().drop(KEEP_COPIES).forEach { it.delete() }
                 dataStore.edit { prefs ->
                     prefs[KEY_AUTO_LAST_AT] = System.currentTimeMillis()
                     prefs.remove(KEY_AUTO_LAST_ERROR)
                 }
+                copyToCloud(name, sealed)
                 file
             }.onFailure { e ->
                 // The record of the failure is what the settings screen shows;
@@ -234,6 +263,73 @@ class BackupRepositoryImpl @Inject constructor(
             }
         // restore() wipes the passphrase it is given.
         restore(Uri.fromFile(latest), passphrase)
+    }
+
+    /**
+     * The cloud copy is best effort on top of a local backup that has already
+     * succeeded: a provider that is signed out or offline must not turn a
+     * good backup into a failed one. The outcome is recorded either way so
+     * the settings screen can say what happened.
+     */
+    private suspend fun copyToCloud(name: String, sealed: ByteArray) {
+        val tree = cloudTree() ?: return
+        val outcome = runCatching {
+            if (!cloud.isGranted(tree)) throw UserFacingException("Access to the cloud folder was revoked. Choose it again.")
+            cloud.write(tree, name, sealed)
+            cloud.listBackups(tree).drop(KEEP_COPIES).forEach { cloud.delete(it.uri) }
+        }
+        dataStore.edit { prefs ->
+            outcome.fold(
+                onSuccess = {
+                    prefs[KEY_CLOUD_LAST_AT] = System.currentTimeMillis()
+                    prefs.remove(KEY_CLOUD_LAST_ERROR)
+                },
+                onFailure = { e -> prefs[KEY_CLOUD_LAST_ERROR] = e.userMessage("The copy to the cloud folder failed") }
+            )
+        }
+    }
+
+    override suspend fun setCloudFolder(treeUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            cloud.take(treeUri)
+            // Prove the folder can be listed before promising to write to it.
+            cloud.listBackups(treeUri)
+            cloudTree()?.takeIf { it != treeUri }?.let(cloud::release)
+            dataStore.edit { prefs ->
+                prefs[KEY_CLOUD_URI] = treeUri.toString()
+                prefs[KEY_CLOUD_NAME] = cloud.displayName(treeUri) ?: "Cloud folder"
+                prefs.remove(KEY_CLOUD_LAST_AT)
+                prefs.remove(KEY_CLOUD_LAST_ERROR)
+            }
+            // A copy of the newest local backup goes up straight away, so the
+            // folder is not empty until next week.
+            localCopies().firstOrNull()?.let { copyToCloud(it.name, it.readBytes()) }
+            Unit
+        }
+    }
+
+    override suspend fun clearCloudFolder(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            cloudTree()?.let(cloud::release)
+            dataStore.edit { prefs ->
+                prefs.remove(KEY_CLOUD_URI)
+                prefs.remove(KEY_CLOUD_NAME)
+                prefs.remove(KEY_CLOUD_LAST_AT)
+                prefs.remove(KEY_CLOUD_LAST_ERROR)
+            }
+            Unit
+        }
+    }
+
+    override suspend fun restoreLatestCloud(): Result<RestoreSummary> = withContext(Dispatchers.IO) {
+        val tree = cloudTree()
+            ?: return@withContext Result.failure(UserFacingException("No cloud folder is set up"))
+        val latest = runCatching { cloud.listBackups(tree).firstOrNull() }
+            .getOrElse { return@withContext Result.failure(UserFacingException("The cloud folder could not be read. Choose it again.")) }
+            ?: return@withContext Result.failure(UserFacingException("No backup has reached the cloud folder yet"))
+        val passphrase = tokenStore.backupPassphrase()
+            ?: return@withContext Result.failure(UserFacingException("Automatic backups are not set up"))
+        restore(latest.uri, passphrase)
     }
 
     override suspend fun exportEncrypted(passphrase: CharArray): Result<File> = withContext(Dispatchers.IO) {
@@ -508,5 +604,9 @@ class BackupRepositoryImpl @Inject constructor(
         val KEY_AUTO_ON = booleanPreferencesKey("auto_backup_enabled")
         val KEY_AUTO_LAST_AT = longPreferencesKey("auto_backup_last_at")
         val KEY_AUTO_LAST_ERROR = stringPreferencesKey("auto_backup_last_error")
+        val KEY_CLOUD_URI = stringPreferencesKey("auto_backup_cloud_uri")
+        val KEY_CLOUD_NAME = stringPreferencesKey("auto_backup_cloud_name")
+        val KEY_CLOUD_LAST_AT = longPreferencesKey("auto_backup_cloud_last_at")
+        val KEY_CLOUD_LAST_ERROR = stringPreferencesKey("auto_backup_cloud_last_error")
     }
 }

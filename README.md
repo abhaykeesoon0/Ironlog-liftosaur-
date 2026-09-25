@@ -62,7 +62,11 @@ and the cloud coach with the user's own API key).
 - **Export and backup** — CSV for workouts, measurements and cardio; a plain
   JSON backup; a passphrase-sealed encrypted backup for moving phones; and a
   weekly automatic encrypted backup kept in private storage, with a one-tap
-  restore of the latest copy.
+  restore of the latest copy. Optionally, each weekly backup is also written
+  to a folder the user picks in Google Drive, OneDrive, Dropbox or any other
+  storage app, through the Storage Access Framework. The app makes no
+  network call of its own; the provider syncs a file it cannot open, and the
+  latest cloud copy can be restored in one tap on a new phone.
 
 ## Security
 

@@ -115,6 +115,23 @@ fun SettingsScreen(
     val autoBackup by viewModel.autoBackup.collectAsStateWithLifecycle()
     var askAutoBackupPassphrase by remember { mutableStateOf(false) }
     var confirmAutoRestore by remember { mutableStateOf(false) }
+    var confirmCloudRestore by remember { mutableStateOf(false) }
+    // The system folder picker: any cloud provider installed on the phone
+    // appears in it, and the grant it returns outlives the app process.
+    val pickCloudFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let(viewModel::setCloudFolder)
+    }
+    if (confirmCloudRestore) {
+        ConfirmDialog(
+            title = "Restore from the cloud folder?",
+            body = "The newest sealed backup in the folder is opened with your stored passphrase and its workouts, " +
+                "routines, measurements and cardio are added to this account. Nothing already here is changed.",
+            confirmLabel = "Restore",
+            onConfirm = { confirmCloudRestore = false; viewModel.restoreLatestCloud() },
+            onDismiss = { confirmCloudRestore = false },
+            destructive = false
+        )
+    }
     if (askAutoBackupPassphrase) {
         PassphraseDialog(
             title = "Turn on weekly backup",
@@ -654,6 +671,44 @@ fun SettingsScreen(
                                 "Turning this off deletes them and forgets the passphrase.",
                             Modifier.padding(top = Space.xs)
                         )
+                        Hairline(Modifier.padding(vertical = Space.sm))
+                        // The copy that survives a lost phone. The folder is the
+                        // user's own, in whatever cloud app they already use.
+                        if (autoBackup.cloudFolderName == null) {
+                            ExportRow(
+                                label = "Also keep a copy in a cloud folder",
+                                busy = false,
+                                enabled = !state.isBackingUp && !state.isRestoring,
+                                onClick = { pickCloudFolder.launch(null) }
+                            )
+                            Caption(
+                                "Pick a folder in Google Drive, OneDrive, Dropbox or any other storage app on this phone. " +
+                                    "Only the sealed file goes there; the passphrase never leaves the phone, so the service " +
+                                    "cannot read your log.",
+                                Modifier.padding(top = Space.xs)
+                            )
+                        } else {
+                            Text("Cloud folder: ${autoBackup.cloudFolderName}", style = MaterialTheme.typography.titleMedium, color = Chalk)
+                            Caption(cloudCaption(autoBackup))
+                            ExportRow(
+                                label = "Restore the latest cloud copy",
+                                busy = state.isRestoring,
+                                enabled = !state.isBackingUp && !state.isRestoring,
+                                onClick = { confirmCloudRestore = true }
+                            )
+                            ExportRow(
+                                label = "Change the cloud folder",
+                                busy = false,
+                                enabled = !state.isBackingUp && !state.isRestoring,
+                                onClick = { pickCloudFolder.launch(null) }
+                            )
+                            ExportRow(
+                                label = "Stop copying to the cloud",
+                                busy = false,
+                                enabled = !state.isBackingUp && !state.isRestoring,
+                                onClick = viewModel::clearCloudFolder
+                            )
+                        }
                     }
                 }
             }
@@ -699,6 +754,15 @@ private fun PermissionRow(title: String, granted: Boolean, rationale: String) {
             color = if (granted) Chalk else ChalkFaint
         )
     }
+}
+
+/** Under the cloud folder's name: when the last copy reached it, or why it did not. */
+private fun cloudCaption(state: AutoBackupState): String = when {
+    state.lastCloudError != null -> state.lastCloudError
+    state.lastCloudBackupAt == null -> "No copy has reached the folder yet."
+    else -> "Last copy " + DateTimeFormatter.ofPattern("d MMM, HH:mm")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(state.lastCloudBackupAt))
 }
 
 /** One line under the switch: when the last copy was made, or why it was not. */

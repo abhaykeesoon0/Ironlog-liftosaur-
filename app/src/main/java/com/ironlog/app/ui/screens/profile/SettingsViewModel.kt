@@ -304,6 +304,33 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** A folder picked in a cloud storage app: every automatic backup is copied there from now on. */
+    fun setCloudFolder(treeUri: Uri) {
+        viewModelScope.launch {
+            backupRepository.setCloudFolder(treeUri)
+                .onSuccess { _state.update { it.copy(message = "Backups will also be kept in that folder.") } }
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not use that folder")) } }
+        }
+    }
+
+    fun clearCloudFolder() {
+        viewModelScope.launch {
+            backupRepository.clearCloudFolder()
+                .onSuccess { _state.update { it.copy(message = "Backups stay on this phone only. Files already in the folder were left there.") } }
+                .onFailure { e -> _state.update { it.copy(error = e.userMessage("Could not stop the cloud copy")) } }
+        }
+    }
+
+    fun restoreLatestCloud() {
+        if (_state.value.isRestoring) return
+        _state.update { it.copy(isRestoring = true, error = null) }
+        viewModelScope.launch {
+            backupRepository.restoreLatestCloud()
+                .onSuccess { summary -> _state.update { it.copy(isRestoring = false, message = restoreMessage(summary)) } }
+                .onFailure { e -> _state.update { it.copy(isRestoring = false, error = e.userMessage("Restore failed")) } }
+        }
+    }
+
     fun restoreLatestAutomatic() {
         if (_state.value.isRestoring) return
         _state.update { it.copy(isRestoring = true, error = null) }

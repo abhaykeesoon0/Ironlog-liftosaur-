@@ -62,6 +62,8 @@ fun PrivacyScreen(onBack: () -> Unit) {
                 "Cloud assistant: your question plus a few lines of your training figures go to Anthropic, with a key " +
                     "you supply. Off until you add one.",
                 "Health Connect: sessions and meals are written to it only after you connect it, and you can revoke that.",
+                "Cloud copy of backups: if you choose a folder in a cloud storage app, each weekly backup is written " +
+                    "there already sealed. The service only ever holds the encrypted file; the passphrase stays on the phone.",
                 "Every connection is HTTPS, with the certificate pinned to the service's root."
             )
 
