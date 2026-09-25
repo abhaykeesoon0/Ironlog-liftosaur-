@@ -1,5 +1,6 @@
 package com.ironlog.app.ui.navigation
 
+import android.net.Uri
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -104,7 +105,8 @@ object Routes {
     const val CARDIO = "cardio"
     const val CARDIO_TRACK = "cardio/track"
     const val CARDIO_SESSION = "cardio/session/{id}"
-    const val SETTINGS = "settings"
+    /** The optional file is one shared into the app: a backup or a CSV export to bring in. */
+    const val SETTINGS = "settings?file={file}"
     const val NUTRITION = "nutrition"
     const val ONBOARDING = "onboarding"
     const val CUSTOMISE_HOME = "home/customise"
@@ -117,6 +119,7 @@ object Routes {
     fun exerciseDetail(id: String) = "exercises/$id"
     fun workoutDetail(id: String, justFinished: Boolean = false) = "history/$id?justFinished=$justFinished"
     fun cardioSession(id: String) = "cardio/session/$id"
+    fun settings(file: Uri? = null) = if (file == null) "settings" else "settings?file=${Uri.encode(file.toString())}"
 
     /** Saved-state key the exercise picker writes its selection into. */
     const val PICKED_EXERCISES = "picked_exercises"
@@ -277,7 +280,7 @@ fun MainNavHost(
                     onOpenNutrition = { navController.navigate(Routes.NUTRITION) },
                     onOpenPhotos = { navController.navigate(Routes.PHOTOS) },
                     onOpenCardio = { navController.navigate(Routes.CARDIO) },
-                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                    onOpenSettings = { navController.navigate(Routes.settings()) },
                     onOpenLibrary = { navController.navigate(Routes.exerciseLibrary(pick = false)) }
                 )
             }
@@ -406,7 +409,10 @@ fun MainNavHost(
             }
 
             // ------------------------------------------------------- settings
-            composable(Routes.SETTINGS) {
+            composable(
+                Routes.SETTINGS,
+                arguments = listOf(navArgument("file") { type = NavType.StringType; nullable = true; defaultValue = null })
+            ) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onChangePassword = { navController.navigate(Routes.CHANGE_PASSWORD) },

@@ -90,10 +90,13 @@ fun PhotosScreen(
     // No screenshots and no thumbnail in the recents switcher while body
     // photos are on screen. The flag is set for this screen only and
     // cleared on the way out, so the rest of the app can still be captured.
+    // Unless the user has asked for the whole app to be uncapturable, in
+    // which case the flag is the activity's to keep.
     val window = (LocalContext.current as? Activity)?.window
-    DisposableEffect(window) {
+    val keepSecure by viewModel.screenshotsBlocked.collectAsStateWithLifecycle()
+    DisposableEffect(window, keepSecure) {
         window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        onDispose { if (!keepSecure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }
 
     val camera = rememberPermissionState(AppPermission.CAMERA)
