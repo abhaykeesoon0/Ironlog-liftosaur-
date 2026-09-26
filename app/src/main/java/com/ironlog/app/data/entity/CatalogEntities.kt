@@ -28,7 +28,13 @@ data class UserEntity(
     val biometricLockEnabled: Boolean = false,
     val restTimerDefaultSeconds: Int = 120,
     val autoRestTimerEnabled: Boolean = true,
-    val weeklyGoalWorkouts: Int = 4
+    val weeklyGoalWorkouts: Int = 4,
+    /**
+     * Whether the address was confirmed through the verification email. True
+     * by default so accounts made before verification existed, and accounts
+     * on a build with no Firebase project, are not locked out.
+     */
+    val emailVerified: Boolean = true
 )
 
 @Entity(

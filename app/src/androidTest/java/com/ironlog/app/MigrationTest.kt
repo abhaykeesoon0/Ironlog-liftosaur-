@@ -66,7 +66,8 @@ class MigrationTest {
             DatabaseModule.MIGRATION_3_4,
             DatabaseModule.MIGRATION_4_5,
             DatabaseModule.MIGRATION_5_6,
-            DatabaseModule.MIGRATION_6_7
+            DatabaseModule.MIGRATION_6_7,
+            DatabaseModule.MIGRATION_7_8
         )
 
         db.query("SELECT name, totalVolumeKg, prCount FROM workouts WHERE id = 'w1'").use { cursor ->

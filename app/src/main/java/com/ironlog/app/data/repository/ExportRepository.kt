@@ -133,7 +133,8 @@ class ExportRepositoryImpl @Inject constructor(
                 passwordHash = u.passwordHash, passwordSalt = u.passwordSalt, createdAt = u.createdAt,
                 unitSystem = u.unitSystem.name, bodyweightKg = u.bodyweightKg, heightCm = u.heightCm,
                 biometricLockEnabled = u.biometricLockEnabled, restTimerDefaultSeconds = u.restTimerDefaultSeconds,
-                autoRestTimerEnabled = u.autoRestTimerEnabled, weeklyGoalWorkouts = u.weeklyGoalWorkouts
+                autoRestTimerEnabled = u.autoRestTimerEnabled, weeklyGoalWorkouts = u.weeklyGoalWorkouts,
+                emailVerified = u.emailVerified
             )
         },
         foods = nutritionDao.customFoods(userId).map { f ->
@@ -208,7 +209,8 @@ data class BackupAccount(
     val biometricLockEnabled: Boolean,
     val restTimerDefaultSeconds: Int,
     val autoRestTimerEnabled: Boolean,
-    val weeklyGoalWorkouts: Int
+    val weeklyGoalWorkouts: Int,
+    val emailVerified: Boolean = true
 )
 
 @Serializable

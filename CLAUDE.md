@@ -93,8 +93,11 @@ binding, not a problem with the call site.
 
 ## Things not to do
 
-- Do not add Firebase, Retrofit or any network dependency. The app is offline by
-  design and the report documents that decision.
+- Do not add Retrofit or any general network dependency. The app is offline by
+  design and the report documents that decision. The one exception, chosen
+  deliberately, is email verification through Firebase Authentication's REST
+  API, called with the app's own HTTP code: no Firebase SDK, no Google Services
+  plugin. Do not widen that into Firebase storage, sync or analytics.
 - Do not write progress photos to shared media storage. They stay in internal
   app storage; this is a stated privacy decision.
 - Do not add a light theme. The app is dark-only by design.

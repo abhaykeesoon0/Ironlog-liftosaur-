@@ -63,6 +63,8 @@ fun PrivacyScreen(onBack: () -> Unit) {
                     "you supply. Off until you add one.",
                 "Coach model on this phone: if you choose to download one, the file comes from huggingface.co once and " +
                     "is checked against its published checksum. After that the model answers on the phone and sends nothing.",
+                "Email verification: when you create an account, your email and password go to Firebase Authentication, " +
+                    "which sends the verification link and records that it was opened. Nothing about your training goes there.",
                 "Health Connect: sessions and meals are written to it only after you connect it, and you can revoke that.",
                 "Cardio map: while a route is on screen, the map tiles for that area come from OpenStreetMap. The tile " +
                     "server sees which area was viewed, never your route, which is drawn on the phone and stored only here.",
