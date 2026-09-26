@@ -378,7 +378,7 @@ class ProfileRepositoryImpl @Inject constructor(
             }
         }
 
-    private companion object {
+    internal companion object {
         val KEY_REMINDER_ON = booleanPreferencesKey("reminder_enabled")
         val KEY_REMINDER_HOUR = intPreferencesKey("reminder_hour")
         val KEY_REMINDER_MINUTE = intPreferencesKey("reminder_minute")
@@ -394,5 +394,44 @@ class ProfileRepositoryImpl @Inject constructor(
         val KEY_ONBOARDED = booleanPreferencesKey("onboarding_done")
         val KEY_BAR_WEIGHT = doublePreferencesKey("bar_weight_kg")
 
+    }
+}
+
+/**
+ * The device-level settings as plain strings, for the backup.
+ *
+ * Only the keys a person would expect to follow them to a new phone: how the
+ * app looks and behaves. Session, onboarding and lock state stay put, because
+ * they describe this phone, not the user.
+ */
+internal object SettingsBackup {
+    private val booleans = listOf(
+        ProfileRepositoryImpl.KEY_REMINDER_ON, ProfileRepositoryImpl.KEY_WELCOME_SOUND,
+        ProfileRepositoryImpl.KEY_WEB_LOOKUPS, ProfileRepositoryImpl.KEY_BLOCK_SCREENSHOTS
+    )
+    private val ints = listOf(
+        ProfileRepositoryImpl.KEY_REMINDER_HOUR, ProfileRepositoryImpl.KEY_REMINDER_MINUTE,
+        ProfileRepositoryImpl.KEY_LOCK_GRACE
+    )
+    private val strings = listOf(
+        ProfileRepositoryImpl.KEY_PLATE_SET, ProfileRepositoryImpl.KEY_STEP_SOURCE,
+        ProfileRepositoryImpl.KEY_MUSCLE_TINT, ProfileRepositoryImpl.KEY_TRAINING_FOCUS,
+        ProfileRepositoryImpl.KEY_HOME_SECTIONS
+    )
+    private val doubles = listOf(ProfileRepositoryImpl.KEY_BAR_WEIGHT)
+
+    fun snapshot(prefs: Preferences): Map<String, String> = buildMap {
+        booleans.forEach { k -> prefs[k]?.let { put(k.name, it.toString()) } }
+        ints.forEach { k -> prefs[k]?.let { put(k.name, it.toString()) } }
+        strings.forEach { k -> prefs[k]?.let { put(k.name, it) } }
+        doubles.forEach { k -> prefs[k]?.let { put(k.name, it.toString()) } }
+    }
+
+    /** Applies what the map carries and parses; a value that does not parse is skipped, not fatal. */
+    fun apply(values: Map<String, String>, prefs: androidx.datastore.preferences.core.MutablePreferences) {
+        booleans.forEach { k -> values[k.name]?.toBooleanStrictOrNull()?.let { prefs[k] = it } }
+        ints.forEach { k -> values[k.name]?.toIntOrNull()?.let { prefs[k] = it } }
+        strings.forEach { k -> values[k.name]?.let { prefs[k] = Validators.sanitiseSingleLine(it, 400) } }
+        doubles.forEach { k -> values[k.name]?.toDoubleOrNull()?.takeIf { it.isFinite() }?.let { prefs[k] = it } }
     }
 }

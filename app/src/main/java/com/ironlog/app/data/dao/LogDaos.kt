@@ -377,6 +377,10 @@ interface StrengthGoalDao {
     @Query("SELECT * FROM strength_goals WHERE id = :id LIMIT 1")
     suspend fun findById(id: String): StrengthGoalEntity?
 
+    /** Every goal, for the backup. */
+    @Query("SELECT * FROM strength_goals WHERE userId = :userId ORDER BY createdAt")
+    suspend fun allForUser(userId: String): List<StrengthGoalEntity>
+
     @Query(
         """
         SELECT * FROM strength_goals
@@ -461,6 +465,13 @@ interface RewardsDao {
 
     @Query("SELECT * FROM store_purchases WHERE userId = :userId AND itemId = :itemId LIMIT 1")
     suspend fun findPurchase(userId: String, itemId: String): StorePurchaseEntity?
+
+    // ------------------------------------------------------------ backup
+    @Query("SELECT * FROM quest_claims WHERE userId = :userId ORDER BY claimedAt")
+    suspend fun allClaims(userId: String): List<QuestClaimEntity>
+
+    @Query("SELECT * FROM store_purchases WHERE userId = :userId ORDER BY purchasedAt")
+    suspend fun allPurchases(userId: String): List<StorePurchaseEntity>
 
     @Query("SELECT * FROM store_purchases WHERE userId = :userId AND itemId IN (:itemIds)")
     suspend fun purchasesIn(userId: String, itemIds: List<String>): List<StorePurchaseEntity>

@@ -66,6 +66,12 @@ and the cloud coach with the user's own API key).
 - **Import** — Strong and Hevy CSV exports, matched by exercise name. A
   backup or CSV shared from another app, or opened from a file manager,
   lands straight on the right import dialog.
+- **Moving phones** — a backup carries the account itself (email plus the
+  password hash and salt, never the password) along with workouts, routines,
+  measurements, cardio, the food log, goals, rewards and settings. On a new
+  phone, "Moving from another phone? Restore a backup" on the sign-in screen
+  recreates the account from the file, and the user signs in with the
+  password they already know. There is no server: the phone is the account.
 - **Export and backup** — CSV for workouts, measurements and cardio; a plain
   JSON backup; a passphrase-sealed encrypted backup for moving phones; and a
   weekly automatic encrypted backup kept in private storage, with a one-tap

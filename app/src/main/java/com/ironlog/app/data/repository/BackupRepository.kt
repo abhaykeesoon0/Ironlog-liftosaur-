@@ -12,6 +12,24 @@ import com.ironlog.app.data.dao.CardioDao
 import com.ironlog.app.data.dao.ExerciseDao
 import com.ironlog.app.data.dao.RoutineDao
 import com.ironlog.app.data.dao.WorkoutDao
+import com.ironlog.app.data.dao.UserDao
+import com.ironlog.app.data.dao.NutritionDao
+import com.ironlog.app.data.dao.StrengthGoalDao
+import com.ironlog.app.data.dao.RewardsDao
+import com.ironlog.app.data.entity.UserEntity
+import com.ironlog.app.data.entity.UnitSystem
+import com.ironlog.app.data.entity.FoodEntity
+import com.ironlog.app.data.entity.FoodGroup
+import com.ironlog.app.data.entity.FoodLogEntity
+import com.ironlog.app.data.entity.Meal
+import com.ironlog.app.data.entity.NutritionGoalEntity
+import com.ironlog.app.data.entity.DietGoal
+import com.ironlog.app.data.entity.Sex
+import com.ironlog.app.data.entity.ActivityLevel
+import com.ironlog.app.data.entity.StrengthGoalEntity
+import com.ironlog.app.data.entity.GoalMetric
+import com.ironlog.app.data.entity.QuestClaimEntity
+import com.ironlog.app.data.entity.StorePurchaseEntity
 import com.ironlog.app.data.entity.BodyMeasurementEntity
 import com.ironlog.app.data.entity.CardioSessionEntity
 import com.ironlog.app.data.entity.CardioType
@@ -57,10 +75,15 @@ data class RestoreSummary(
     val measurements: Int,
     val cardio: Int,
     val exercisesCreated: Int,
-    val skipped: Int
+    val skipped: Int,
+    val foodLogs: Int = 0,
+    val goals: Int = 0
 ) {
-    val isEmpty: Boolean get() = workouts + routines + measurements + cardio == 0
+    val isEmpty: Boolean get() = workouts + routines + measurements + cardio + foodLogs + goals == 0
 }
+
+/** What a backup restored on a fresh phone gave back: the account to sign in to, and its data. */
+data class RestoredAccount(val email: String, val displayName: String, val summary: RestoreSummary)
 
 /** Where the weekly backup stands, for the settings screen. */
 data class AutoBackupState(
@@ -136,6 +159,14 @@ interface BackupRepository {
     suspend fun restore(uri: Uri, passphrase: CharArray?): Result<RestoreSummary>
     /** Reads a Strong or Hevy CSV export and adds its workouts, matching exercises by name. */
     suspend fun importCsv(uri: Uri): Result<RestoreSummary>
+
+    /**
+     * For a phone with no account yet: recreates the account carried in the
+     * backup, with the same email and password hash, and restores its data.
+     * Needs no session, which is the point. Refused if that email already has
+     * an account here, since then the signed-in restore is the right path.
+     */
+    suspend fun restoreAccount(uri: Uri, passphrase: CharArray?): Result<RestoredAccount>
 }
 
 @Singleton
@@ -150,6 +181,10 @@ class BackupRepositoryImpl @Inject constructor(
     private val routineDao: RoutineDao,
     private val bodyDao: BodyDao,
     private val cardioDao: CardioDao,
+    private val userDao: UserDao,
+    private val nutritionDao: NutritionDao,
+    private val goalDao: StrengthGoalDao,
+    private val rewardsDao: RewardsDao,
     private val currentUser: CurrentUser,
     private val dataStore: DataStore<Preferences>,
     private val tokenStore: SecureTokenStore,
@@ -568,7 +603,161 @@ class BackupRepositoryImpl @Inject constructor(
             cardio++
         }
 
-        return RestoreSummary(workouts, routines, measurements, cardio, created, skipped)
+        // ---------------------------------------------------------- nutrition
+        // Custom foods first, so the logs that refer to them have something to
+        // point at. Seeded foods share ids across phones; a custom one is
+        // matched by name, and created from the backup's own copy if missing.
+        val knownFoods = HashMap<String, String>()
+        backup.foods.forEach { f ->
+            val name = Validators.sanitiseSingleLine(f.name, 80)
+            val existing = nutritionDao.findFood(f.id)?.takeIf { it.ownerUserId == null || it.ownerUserId == userId }
+                ?: nutritionDao.findFoodByName(userId, name)
+            if (existing != null) { knownFoods[f.id] = existing.id; return@forEach }
+            val id = UUID.randomUUID().toString()
+            nutritionDao.upsertFood(
+                FoodEntity(
+                    id = id, name = name.ifBlank { "Restored food" },
+                    group = runCatching { FoodGroup.valueOf(f.group) }.getOrDefault(FoodGroup.entries.first()),
+                    kcalPer100g = f.kcalPer100g, proteinPer100g = f.proteinPer100g, carbsPer100g = f.carbsPer100g,
+                    fatPer100g = f.fatPer100g, servingGrams = f.servingGrams,
+                    servingLabel = Validators.sanitiseSingleLine(f.servingLabel, 40), ownerUserId = userId,
+                    isCustom = true, barcode = f.barcode?.takeIf { it.all(Char::isDigit) && it.length in 6..14 }
+                )
+            )
+            knownFoods[f.id] = id
+        }
+        val existingLogs = nutritionDao.allLogs(userId).map { it.loggedAt to it.foodId }.toHashSet()
+        var foodLogs = 0
+        backup.foodLogs.forEach { log ->
+            val foodId = knownFoods[log.foodId]
+                ?: nutritionDao.findFood(log.foodId)?.takeIf { it.ownerUserId == null || it.ownerUserId == userId }?.id
+                ?: nutritionDao.findFoodByName(userId, log.foodName.trim())?.id
+                ?: run { skipped++; return@forEach }
+            if ((log.loggedAt to foodId) in existingLogs) { skipped++; return@forEach }
+            nutritionDao.upsertLog(
+                FoodLogEntity(
+                    id = UUID.randomUUID().toString(), userId = userId, foodId = foodId,
+                    grams = log.grams.coerceIn(0.0, 5000.0),
+                    meal = runCatching { Meal.valueOf(log.meal) }.getOrDefault(Meal.entries.first()),
+                    loggedAt = log.loggedAt, note = Validators.sanitiseText(log.note, 300)
+                )
+            )
+            existingLogs += log.loggedAt to foodId
+            foodLogs++
+        }
+        backup.nutritionGoal?.let { g ->
+            val current = nutritionDao.findGoal(userId)
+            if (current == null || current.updatedAt < g.updatedAt) {
+                nutritionDao.upsertGoal(
+                    NutritionGoalEntity(
+                        userId = userId,
+                        goal = runCatching { DietGoal.valueOf(g.goal) }.getOrDefault(DietGoal.entries.first()),
+                        sex = runCatching { Sex.valueOf(g.sex) }.getOrDefault(Sex.entries.first()),
+                        ageYears = g.ageYears.coerceIn(10, 120),
+                        activity = runCatching { ActivityLevel.valueOf(g.activity) }.getOrDefault(ActivityLevel.entries.first()),
+                        targetKcal = g.targetKcal.coerceIn(0, 20_000), proteinG = g.proteinG.coerceIn(0, 2_000),
+                        carbsG = g.carbsG.coerceIn(0, 4_000), fatG = g.fatG.coerceIn(0, 2_000), updatedAt = g.updatedAt
+                    )
+                )
+            }
+        }
+
+        // ---------------------------------------------------------- goals, rewards, settings
+        var goals = 0
+        backup.strengthGoals.forEach { g ->
+            val metric = runCatching { GoalMetric.valueOf(g.metric) }.getOrNull() ?: run { skipped++; return@forEach }
+            val exerciseId = exercise(g.exerciseId, g.exerciseName).id
+            if (goalDao.findFor(userId, exerciseId, metric) != null) { skipped++; return@forEach }
+            goalDao.upsert(
+                StrengthGoalEntity(
+                    id = UUID.randomUUID().toString(), userId = userId, exerciseId = exerciseId, metric = metric,
+                    targetKg = g.targetKg.coerceIn(0.0, Validators.MAX_WEIGHT_KG), createdAt = g.createdAt, achievedAt = g.achievedAt
+                )
+            )
+            goals++
+        }
+        backup.questClaims.forEach { c ->
+            if (rewardsDao.claimCount(userId, c.questId, c.periodKey) > 0) return@forEach
+            rewardsDao.upsertClaim(
+                QuestClaimEntity(
+                    id = UUID.randomUUID().toString(), userId = userId, questId = c.questId,
+                    periodKey = c.periodKey, coins = c.coins.coerceIn(0, 100_000), claimedAt = c.claimedAt
+                )
+            )
+        }
+        backup.purchases.forEach { p ->
+            if (rewardsDao.findPurchase(userId, p.itemId) != null) return@forEach
+            rewardsDao.upsertPurchase(
+                StorePurchaseEntity(
+                    id = UUID.randomUUID().toString(), userId = userId, itemId = p.itemId,
+                    coinsSpent = p.coinsSpent.coerceIn(0, 100_000), purchasedAt = p.purchasedAt, isEquipped = p.isEquipped
+                )
+            )
+        }
+        if (backup.settings.isNotEmpty()) {
+            dataStore.edit { prefs -> SettingsBackup.apply(backup.settings, prefs) }
+        }
+
+        return RestoreSummary(workouts, routines, measurements, cardio, created, skipped, foodLogs, goals)
+    }
+
+    override suspend fun restoreAccount(uri: Uri, passphrase: CharArray?): Result<RestoredAccount> =
+        withContext(Dispatchers.IO) {
+            try {
+                runCatching {
+                    val backup = decodeBackup(read(uri), passphrase)
+                    val account = backup.account
+                        ?: throw UserFacingException("This backup was made before accounts were included. Create an account, then restore it from Settings.")
+                    val email = Validators.sanitiseEmail(account.email)
+                    if (userDao.countByEmail(email) > 0) {
+                        throw UserFacingException("An account for ${account.email} already exists on this phone. Sign in to it and restore from Settings.")
+                    }
+                    if (account.passwordHash.isBlank() || account.passwordSalt.isBlank()) {
+                        throw UserFacingException("The account in this backup cannot be signed in to.")
+                    }
+                    val user = UserEntity(
+                        id = account.id.ifBlank { UUID.randomUUID().toString() },
+                        email = email,
+                        displayName = Validators.sanitiseSingleLine(account.displayName, 60).ifBlank { "Restored" },
+                        passwordHash = account.passwordHash,
+                        passwordSalt = account.passwordSalt,
+                        createdAt = account.createdAt,
+                        unitSystem = runCatching { UnitSystem.valueOf(account.unitSystem) }.getOrDefault(UnitSystem.METRIC),
+                        bodyweightKg = account.bodyweightKg?.takeIf { it in 20.0..500.0 },
+                        heightCm = account.heightCm?.takeIf { it in 50.0..300.0 },
+                        // The lock is this phone's decision, not the old one's.
+                        biometricLockEnabled = false,
+                        restTimerDefaultSeconds = account.restTimerDefaultSeconds.coerceIn(15, 600),
+                        autoRestTimerEnabled = account.autoRestTimerEnabled,
+                        weeklyGoalWorkouts = account.weeklyGoalWorkouts.coerceIn(1, 14)
+                    )
+                    val summary = db.withTransaction {
+                        userDao.insert(user)
+                        restoreInto(user.id, backup)
+                    }
+                    RestoredAccount(user.email, user.displayName, summary)
+                }
+            } finally {
+                passphrase?.wipe()
+            }
+        }
+
+    /** Opens a backup file's bytes: unsealed with the passphrase if it needs one, then parsed. */
+    private fun decodeBackup(bytes: ByteArray, passphrase: CharArray?): Backup {
+        val plain = if (crypto.looksLikeBackup(bytes)) {
+            val pass = passphrase ?: throw UserFacingException("This backup needs its passphrase")
+            try {
+                crypto.decrypt(bytes, pass)
+            } catch (e: BackupCrypto.WrongPassphraseException) {
+                throw UserFacingException(e.message ?: "Wrong passphrase")
+            }
+        } else {
+            bytes
+        }
+        val backup = runCatching { json.decodeFromString(Backup.serializer(), plain.decodeToString()) }
+            .getOrElse { throw UserFacingException("That file is not a Liftosaur backup") }
+        if (backup.format != "ironlog-backup") throw UserFacingException("That file is not a Liftosaur backup")
+        return backup
     }
 
     private fun read(uri: Uri): ByteArray =

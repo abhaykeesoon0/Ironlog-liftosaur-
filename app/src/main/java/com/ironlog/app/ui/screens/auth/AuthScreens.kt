@@ -13,6 +13,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.ironlog.app.ui.components.Caption
+import com.ironlog.app.ui.components.ConfirmDialog
+import com.ironlog.app.ui.components.PassphraseDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,9 +56,37 @@ fun SignInScreen(
     val activity = LocalContext.current.findFragmentActivity()
     val biometricGate = remember(activity) { activity?.let { BiometricGate(it) } }
     var resetting by remember { mutableStateOf(false) }
+    // A backup from another phone: the account comes across with its data,
+    // and the user signs in with the password they already know.
+    val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::onRestoreFileChosen)
+    }
 
     LaunchedEffect(state.isComplete) {
         if (state.isComplete) onSignedIn()
+    }
+
+    state.restoreUri?.let {
+        if (state.restoreNeedsPassphrase) {
+            PassphraseDialog(
+                title = "Open the backup",
+                body = "Enter the passphrase this backup was sealed with on your other phone.",
+                confirmLabel = "Restore",
+                minLength = 1,
+                onConfirm = { pass -> viewModel.restoreAccount(pass) },
+                onDismiss = viewModel::cancelRestore
+            )
+        } else {
+            ConfirmDialog(
+                title = "Restore this account?",
+                body = "The account in the backup is created on this phone with its workouts, routines, measurements, " +
+                    "cardio, food log, goals and settings. You then sign in with your usual password.",
+                confirmLabel = "Restore",
+                onConfirm = { viewModel.restoreAccount(null) },
+                onDismiss = viewModel::cancelRestore,
+                destructive = false
+            )
+        }
     }
 
     AuthScaffold(
@@ -62,6 +95,10 @@ fun SignInScreen(
     ) {
         ErrorBanner(state.generalError)
         if (state.generalError != null) Spacer(Modifier.height(Space.lg))
+        state.restoreMessage?.let {
+            Caption(it)
+            Spacer(Modifier.height(Space.lg))
+        }
 
         IronTextField(
             value = state.email,
@@ -127,6 +164,14 @@ fun SignInScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("No account yet? Create one", color = ChalkDim)
+        }
+
+        TextButton(
+            onClick = { pickBackup.launch(arrayOf("*/*")) },
+            enabled = !state.isRestoring && !state.isSubmitting,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (state.isRestoring) "Restoring your account…" else "Moving from another phone? Restore a backup", color = ChalkDim)
         }
     }
 

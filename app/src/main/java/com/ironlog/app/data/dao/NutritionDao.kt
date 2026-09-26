@@ -62,5 +62,18 @@ interface NutritionDao {
     @Query("SELECT * FROM nutrition_goals WHERE userId = :userId LIMIT 1")
     fun observeGoal(userId: String): Flow<NutritionGoalEntity?>
 
+    // ------------------------------------------------------------ backup
+    @Query("SELECT * FROM nutrition_goals WHERE userId = :userId LIMIT 1")
+    suspend fun findGoal(userId: String): NutritionGoalEntity?
+
+    @Query("SELECT * FROM food_logs WHERE userId = :userId ORDER BY loggedAt")
+    suspend fun allLogs(userId: String): List<FoodLogEntity>
+
+    @Query("SELECT * FROM foods WHERE ownerUserId = :userId ORDER BY name")
+    suspend fun customFoods(userId: String): List<FoodEntity>
+
+    @Query("SELECT * FROM foods WHERE name = :name AND (ownerUserId IS NULL OR ownerUserId = :userId) LIMIT 1")
+    suspend fun findFoodByName(userId: String, name: String): FoodEntity?
+
     @Upsert suspend fun upsertGoal(goal: NutritionGoalEntity)
 }
