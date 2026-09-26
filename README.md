@@ -149,9 +149,10 @@ release install.
 
 Produces one signed, shrunk APK per CPU architecture under
 `app/build/outputs/apk/release/`, plus a universal one. Install the
-`arm64-v8a` APK on any modern phone (about 48 MB, of which roughly half is
-the on-device inference runtime for the coach model); the universal APK
-(about 156 MB) works on anything.
+`arm64-v8a` APK on any modern phone (about 27 MB to download; the native
+libraries, half of them the coach model's inference runtime, are stored
+compressed and extracted on install); the universal APK (about 70 MB) works
+on anything.
 
 Signing reads `keystore.properties` in the project root, which names the
 keystore file and holds its passwords. Both are ignored by git. Without the

@@ -93,6 +93,11 @@ android {
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+        // Native libraries are stored compressed and extracted on install.
+        // The inference runtime alone is 25 MB uncompressed; compressed, the
+        // whole arm64 APK is about 26 MB, which is what a download or a
+        // transfer costs. The installed size is unchanged either way.
+        jniLibs { useLegacyPackaging = true }
     }
 }
 
