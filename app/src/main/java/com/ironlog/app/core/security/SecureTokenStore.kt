@@ -109,6 +109,19 @@ class SecureTokenStore @Inject constructor(
         }.apply()
     }
 
+    /**
+     * Firebase's refresh token for one account, so the app can ask whether
+     * the address has been verified without holding the password. Encrypted
+     * like everything else here; removed with the account.
+     */
+    fun verifierToken(userId: String): String? = prefs.getString("verifier_$userId", null)
+
+    fun saveVerifierToken(userId: String, value: String?) {
+        prefs.edit().apply {
+            if (value.isNullOrBlank()) remove("verifier_$userId") else putString("verifier_$userId", value)
+        }.apply()
+    }
+
     /** Failures and the lock deadline for one account, keyed by a hash of the email. */
     fun loginThrottle(key: String): Pair<Int, Long> =
         prefs.getInt("throttle_f_$key", 0) to prefs.getLong("throttle_u_$key", 0L)

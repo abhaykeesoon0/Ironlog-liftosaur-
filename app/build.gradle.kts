@@ -34,6 +34,16 @@ android {
         .takeIf { it.exists() }
         ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
 
+    // Firebase's web API key for email verification. It is a project
+    // identifier, not a secret, but it belongs to one deployment, so it
+    // lives in local.properties (firebase.webApiKey=...) and never in git.
+    // Absent, verification is skipped and the app still builds and runs.
+    val localProperties = rootProject.file("local.properties")
+        .takeIf { it.exists() }
+        ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
+    val firebaseWebApiKey = localProperties?.getProperty("firebase.webApiKey")?.trim().orEmpty()
+    defaultConfig.buildConfigField("String", "FIREBASE_WEB_API_KEY", "\"$firebaseWebApiKey\"")
+
     signingConfigs {
         if (keystoreProperties != null) {
             create("release") {

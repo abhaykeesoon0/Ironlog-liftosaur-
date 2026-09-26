@@ -6,6 +6,7 @@ import com.ironlog.app.core.security.TokenResult
 import com.ironlog.app.core.security.TokenService
 import com.ironlog.app.core.security.Validators
 import com.ironlog.app.core.security.wipe
+import com.ironlog.app.core.auth.EmailVerifier
 import com.ironlog.app.data.dao.UserDao
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.entity.UserEntity
@@ -32,7 +33,12 @@ enum class AuthField { EMAIL, PASSWORD, CONFIRM_PASSWORD, NAME }
 sealed interface SessionState {
     data object Loading : SessionState
     data object SignedOut : SessionState
-    data class SignedIn(val userId: String, val requiresBiometricUnlock: Boolean) : SessionState
+    data class SignedIn(
+        val userId: String,
+        val requiresBiometricUnlock: Boolean,
+        /** The address has not been confirmed through its verification email yet. */
+        val requiresEmailVerification: Boolean = false
+    ) : SessionState
 }
 
 interface AuthRepository {
@@ -63,6 +69,12 @@ interface AuthRepository {
     suspend fun resetPasswordAfterDeviceAuth(email: String, new: CharArray): AuthResult
     fun observeUser(userId: String): Flow<UserEntity?>
     suspend fun currentUser(): UserEntity?
+
+    /** Sends the verification email again for the signed-in account. */
+    suspend fun resendVerificationEmail(): Result<Unit>
+
+    /** Asks the verification service whether the link has been opened; true once it has. */
+    suspend fun confirmEmailVerified(): Result<Boolean>
     fun markBiometricUnlocked()
     fun lock()
 }
@@ -72,7 +84,8 @@ class AuthRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     private val hasher: PasswordHasher,
     private val tokens: TokenService,
-    private val tokenStore: SecureTokenStore
+    private val tokenStore: SecureTokenStore,
+    private val verifier: EmailVerifier
 ) : AuthRepository {
 
     private val _sessionState = MutableStateFlow<SessionState>(SessionState.Loading)
@@ -108,6 +121,17 @@ class AuthRepositoryImpl @Inject constructor(
                 )
             }
 
+            // The verification service is asked first, while the password is
+            // still in hand: if it refuses, no half-made account is left behind.
+            val verified = when {
+                !verifier.isConfigured -> true
+                else -> try {
+                    enrolWithVerifier(cleanEmail, password)
+                } catch (e: EmailVerifier.VerifierException) {
+                    return@withContext AuthResult.Failure(e.message ?: "Could not send the verification email")
+                }
+            }
+
             val salt = hasher.newSalt()
             val user = UserEntity(
                 id = UUID.randomUUID().toString(),
@@ -116,9 +140,12 @@ class AuthRepositoryImpl @Inject constructor(
                 passwordHash = hasher.hash(password, salt),
                 passwordSalt = salt,
                 createdAt = System.currentTimeMillis(),
-                unitSystem = UnitSystem.METRIC
+                unitSystem = UnitSystem.METRIC,
+                emailVerified = verified
             )
             userDao.insert(user)
+            pendingVerifierToken?.let { tokenStore.saveVerifierToken(user.id, it) }
+            pendingVerifierToken = null
 
             issueSession(user)
             AuthResult.Success(user.id)
@@ -170,8 +197,20 @@ class AuthRepositoryImpl @Inject constructor(
                 }
 
                 tokenStore.saveLoginThrottle(throttleKey, 0, 0L)
-                issueSession(user)
-                AuthResult.Success(user.id)
+                // Still unverified here, but the link may have been opened since:
+                // the service is asked while the password is available, and a
+                // phone without a connection simply stays gated for now.
+                val current = if (verifier.isConfigured && !user.emailVerified) {
+                    runCatching {
+                        val session = verifier.signIn(cleanEmail, password)
+                        tokenStore.saveVerifierToken(user.id, session.refreshToken)
+                        if (verifier.isVerified(session.idToken)) {
+                            user.copy(emailVerified = true).also { userDao.update(it) }
+                        } else user
+                    }.getOrDefault(user)
+                } else user
+                issueSession(current)
+                AuthResult.Success(current.id)
             } catch (e: Exception) {
                 AuthResult.Failure(e.message ?: "Could not sign in")
             } finally {
@@ -206,7 +245,7 @@ class AuthRepositoryImpl @Inject constructor(
                     tokenStore.clearSession()
                     SessionState.SignedOut
                 } else {
-                    SessionState.SignedIn(user.id, user.biometricLockEnabled)
+                    SessionState.SignedIn(user.id, user.biometricLockEnabled, needsVerification(user))
                 }
             }
 
@@ -215,7 +254,7 @@ class AuthRepositoryImpl @Inject constructor(
                 val user = refreshed?.let { userDao.findById(userId) }
                 if (refreshed != null && user != null) {
                     tokenStore.saveSession(user.id, refreshed)
-                    SessionState.SignedIn(user.id, user.biometricLockEnabled)
+                    SessionState.SignedIn(user.id, user.biometricLockEnabled, needsVerification(user))
                 } else {
                     tokenStore.clearSession()
                     SessionState.SignedOut
@@ -340,10 +379,77 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun resendVerificationEmail(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val session = verifierSession() ?: throw UserFacingException("Sign in again to resend the verification email.")
+            verifier.sendVerificationEmail(session.idToken)
+        }.recoverCatching { e -> throw asUserFacing(e) }
+    }
+
+    override suspend fun confirmEmailVerified(): Result<Boolean> = withContext(Dispatchers.IO) {
+        runCatching {
+            val userId = tokenStore.userId() ?: throw NotSignedInException()
+            val user = userDao.findById(userId) ?: throw NotSignedInException()
+            if (user.emailVerified || !verifier.isConfigured) {
+                clearVerificationGate()
+                return@runCatching true
+            }
+            val session = verifierSession() ?: throw UserFacingException("Sign in again to finish verifying your email.")
+            val verified = verifier.isVerified(session.idToken)
+            if (verified) {
+                userDao.update(user.copy(emailVerified = true))
+                clearVerificationGate()
+            }
+            verified
+        }.recoverCatching { e -> throw asUserFacing(e) }
+    }
+
+    /** A verification session for the signed-in account, from the stored refresh token. */
+    private suspend fun verifierSession(): EmailVerifier.Session? {
+        val userId = tokenStore.userId() ?: return null
+        val refresh = tokenStore.verifierToken(userId) ?: return null
+        val session = verifier.refresh(refresh)
+        if (session.refreshToken.isNotBlank()) tokenStore.saveVerifierToken(userId, session.refreshToken)
+        return session
+    }
+
+    private var pendingVerifierToken: String? = null
+
+    /**
+     * Registers the address with the verification service and sends the
+     * email. An address the service already knows -- the same person on a
+     * second phone, or an account restored from a backup -- is signed in to
+     * instead, and its existing verified state is respected.
+     */
+    private suspend fun enrolWithVerifier(email: String, password: CharArray): Boolean {
+        val session = try {
+            verifier.signUp(email, password)
+        } catch (e: EmailVerifier.VerifierException) {
+            if (e.code != "EMAIL_EXISTS") throw e
+            verifier.signIn(email, password)
+        }
+        pendingVerifierToken = session.refreshToken
+        val alreadyVerified = runCatching { verifier.isVerified(session.idToken) }.getOrDefault(false)
+        if (!alreadyVerified) verifier.sendVerificationEmail(session.idToken)
+        return alreadyVerified
+    }
+
+    private fun needsVerification(user: UserEntity): Boolean = verifier.isConfigured && !user.emailVerified
+
+    private fun clearVerificationGate() {
+        val state = _sessionState.value
+        if (state is SessionState.SignedIn) _sessionState.value = state.copy(requiresEmailVerification = false)
+    }
+
+    private fun asUserFacing(e: Throwable): Throwable = when (e) {
+        is EmailVerifier.VerifierException -> UserFacingException(e.message ?: "The verification service returned an error")
+        else -> e
+    }
+
     private fun issueSession(user: UserEntity) {
         val pair = tokens.issue(user.id, user.email)
         tokenStore.saveSession(user.id, pair)
-        _sessionState.value = SessionState.SignedIn(user.id, requiresBiometricUnlock = false)
+        _sessionState.value = SessionState.SignedIn(user.id, requiresBiometricUnlock = false, requiresEmailVerification = needsVerification(user))
     }
 
     private companion object {

@@ -85,7 +85,7 @@ object DatabaseModule {
             // No destructive fallback: silently wiping a user's training history
             // on a schema change would be a data-loss bug, not a convenience.
             // Migrations are added explicitly when the schema moves.
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
             .build()
     }
 
@@ -179,6 +179,13 @@ object DatabaseModule {
     }
 
     /** Heart rate from a strap on cardio sessions. Two nullable columns. */
+    /** Email verification. Existing accounts are treated as verified: they predate the check. */
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `users` ADD COLUMN `emailVerified` INTEGER NOT NULL DEFAULT 1")
+        }
+    }
+
     val MIGRATION_6_7 = object : Migration(6, 7) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `cardio_sessions` ADD COLUMN `avgHeartRate` INTEGER")

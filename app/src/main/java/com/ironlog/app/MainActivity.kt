@@ -69,6 +69,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.ironlog.app.ui.screens.onboarding.OnboardingScreen
+import com.ironlog.app.ui.screens.auth.VerifyEmailScreen
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -209,9 +210,14 @@ private fun IronLogApp(
             Box(Modifier.fillMaxSize()) {
                 key(state.userId) {
                     MainNavHost(
-                        deepLinkRoute = deepLinkRoute.takeIf { !state.requiresBiometricUnlock },
+                        deepLinkRoute = deepLinkRoute.takeIf { !state.requiresBiometricUnlock && !state.requiresEmailVerification },
                         onDeepLinkConsumed = onDeepLinkConsumed
                     )
+                }
+                // The email gate sits under the lock: a locked phone shows the lock,
+                // an unlocked one with an unconfirmed address shows the gate.
+                if (state.requiresEmailVerification && !state.requiresBiometricUnlock) {
+                    VerifyEmailScreen()
                 }
                 if (state.requiresBiometricUnlock) {
                     BiometricLockScreen(

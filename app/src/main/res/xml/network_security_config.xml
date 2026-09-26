@@ -45,6 +45,15 @@
         </pin-set>
     </domain-config>
 
+    <!-- Firebase Authentication, for the verification email: Google Trust Services Root R4 (backup R1). -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <pin-set expiration="2027-09-24">
+            <pin digest="SHA-256">mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</pin>
+            <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>
+        </pin-set>
+    </domain-config>
+
     <!-- Anthropic (the user's own key): Google Trust Services Root R4 (backup R1). -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">anthropic.com</domain>

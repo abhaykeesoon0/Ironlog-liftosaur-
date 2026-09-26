@@ -83,6 +83,14 @@ and the cloud coach with the user's own API key).
 
 ## Security
 
+- **Email verification** — a new account must open the link in a
+  verification email before it can be used. The email is sent by Firebase
+  Authentication, spoken to over its REST API with the app's own HTTP code
+  (no SDK): Firebase holds the email, a credential and the verified flag,
+  and nothing else. The Firebase web API key is read from
+  `local.properties` (`firebase.webApiKey=...`); without one, the app builds
+  and runs with verification switched off. Accounts that predate the check
+  are treated as verified.
 - **Passwords** are hashed with PBKDF2-HMAC-SHA256 (120,000 iterations,
   random salt) and compared in constant time. They travel through the app
   as `CharArray` and are wiped after use.

@@ -729,7 +729,8 @@ class BackupRepositoryImpl @Inject constructor(
                         biometricLockEnabled = false,
                         restTimerDefaultSeconds = account.restTimerDefaultSeconds.coerceIn(15, 600),
                         autoRestTimerEnabled = account.autoRestTimerEnabled,
-                        weeklyGoalWorkouts = account.weeklyGoalWorkouts.coerceIn(1, 14)
+                        weeklyGoalWorkouts = account.weeklyGoalWorkouts.coerceIn(1, 14),
+                        emailVerified = account.emailVerified
                     )
                     val summary = db.withTransaction {
                         userDao.insert(user)
