@@ -17,6 +17,7 @@ healthConnect = "1.1.0-alpha07"
 mlkitGenaiPrompt = "1.0.0-beta4"
 mlkitBarcode = "17.3.0"
 mediapipeGenai = "0.10.35"
+osmdroid = "6.1.20"
 camerax = "1.4.2"
 glance = "1.1.1"
 sqlcipher = "4.6.1"
@@ -65,6 +66,8 @@ mlkit-genai-prompt = { group = "com.google.mlkit", name = "genai-prompt", versio
 mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
 # A language model that runs on the phone from a file the user downloads once.
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeGenai" }
+# OpenStreetMap tiles for the cardio route. No key; the tiles are the only thing fetched.
+osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }

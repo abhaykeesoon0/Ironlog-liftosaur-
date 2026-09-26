@@ -47,7 +47,11 @@ and the cloud coach with the user's own API key).
   compare view. The photos screen blocks screenshots.
 - **Outdoor cardio** — GPS route tracking in a foreground service with
   distance, pace, elevation, steps, an estimated calorie figure and, when a
-  Bluetooth LE heart-rate strap is paired, live and average heart rate.
+  Bluetooth LE heart-rate strap is paired, live and average heart rate. The
+  route is drawn live on a real map from OpenStreetMap tiles (osmdroid, no
+  key), following the runner, and every saved session shows its route on the
+  map. The tile server only ever sees which map area was viewed; the route
+  itself never leaves the phone.
 - **Nutrition** — a food log with a barcode scanner (on-device ML Kit, looked
   up on Open Food Facts), daily targets, and a meal-plan generator.
 
@@ -145,8 +149,9 @@ release install.
 
 Produces one signed, shrunk APK per CPU architecture under
 `app/build/outputs/apk/release/`, plus a universal one. Install the
-`arm64-v8a` APK on any modern phone (about 22 MB); the universal APK
-(about 52 MB) works on anything.
+`arm64-v8a` APK on any modern phone (about 48 MB, of which roughly half is
+the on-device inference runtime for the coach model); the universal APK
+(about 156 MB) works on anything.
 
 Signing reads `keystore.properties` in the project root, which names the
 keystore file and holds its passwords. Both are ignored by git. Without the
