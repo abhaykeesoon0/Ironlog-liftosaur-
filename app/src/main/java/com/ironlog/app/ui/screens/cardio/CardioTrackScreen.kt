@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -53,7 +54,7 @@ import com.ironlog.app.ui.components.IronCard
 import com.ironlog.app.ui.components.IronChip
 import com.ironlog.app.ui.components.IronTopBar
 import com.ironlog.app.ui.components.PrimaryButton
-import com.ironlog.app.ui.components.RouteShape
+import com.ironlog.app.ui.components.RouteMap
 import com.ironlog.app.ui.components.SecondaryButton
 import com.ironlog.app.ui.components.StatTile
 import com.ironlog.app.ui.format.formatClock
@@ -167,17 +168,18 @@ fun CardioTrackScreen(
                     LiveReadout(progress, unit)
                     Spacer(Modifier.height(Space.lg))
 
-                    val normalised = remember(progress.points) { GeoMath.normalise(progress.points) }
+                    // The route on a real map, following the runner while live.
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(240.dp)
-                            .background(Slate800, RoundedCornerShape(Radius.card)),
+                            .height(280.dp)
+                            .clip(RoundedCornerShape(Radius.card))
+                            .background(Slate800),
                         contentAlignment = Alignment.Center
                     ) {
-                        RouteShape(normalised, Modifier.fillMaxSize())
-                        if (normalised.size < 2) {
-                            Caption(if (phase == Phase.LIVE) "Your route will appear as you move" else "No route recorded")
+                        RouteMap(points = progress.points, live = phase == Phase.LIVE, modifier = Modifier.fillMaxSize())
+                        if (progress.points.isEmpty()) {
+                            Caption(if (phase == Phase.LIVE) "Waiting for a GPS fix" else "No route recorded")
                         }
                     }
                     Spacer(Modifier.height(Space.lg))

@@ -129,6 +129,8 @@ dependencies {
     implementation(libs.mlkit.barcode.scanning)
     // Runs a downloaded language model on the phone for the coach. No network of its own.
     implementation(libs.mediapipe.tasks.genai)
+    // The cardio route on a real map, from OpenStreetMap tiles with no key.
+    implementation(libs.osmdroid.android)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)

@@ -64,6 +64,8 @@ fun PrivacyScreen(onBack: () -> Unit) {
                 "Coach model on this phone: if you choose to download one, the file comes from huggingface.co once and " +
                     "is checked against its published checksum. After that the model answers on the phone and sends nothing.",
                 "Health Connect: sessions and meals are written to it only after you connect it, and you can revoke that.",
+                "Cardio map: while a route is on screen, the map tiles for that area come from OpenStreetMap. The tile " +
+                    "server sees which area was viewed, never your route, which is drawn on the phone and stored only here.",
                 "Cloud copy of backups: if you choose a folder in a cloud storage app, each weekly backup is written " +
                     "there already sealed. The service only ever holds the encrypted file; the passphrase stays on the phone.",
                 "Every connection is HTTPS, with the certificate pinned to the service's root."

@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
@@ -33,6 +34,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.ironlog.app.core.location.GeoMath
+import com.ironlog.app.core.location.RoutePoint
 import com.ironlog.app.data.entity.CardioSessionEntity
 import com.ironlog.app.data.entity.UnitSystem
 import com.ironlog.app.data.repository.CardioRepository
@@ -45,7 +47,7 @@ import com.ironlog.app.ui.components.ErrorBanner
 import com.ironlog.app.ui.components.IronCard
 import com.ironlog.app.ui.components.IronTopBar
 import com.ironlog.app.ui.components.LoadingBlock
-import com.ironlog.app.ui.components.RouteShape
+import com.ironlog.app.ui.components.RouteMap
 import com.ironlog.app.ui.components.StatTile
 import com.ironlog.app.ui.format.formatClock
 import com.ironlog.app.ui.format.formatDistance
@@ -72,6 +74,8 @@ import kotlin.math.roundToInt
 data class SessionDetail(
     val session: CardioSessionEntity? = null,
     val route: List<Pair<Float, Float>> = emptyList(),
+    /** The raw fixes, for the map. */
+    val points: List<RoutePoint> = emptyList(),
     val unit: UnitSystem = UnitSystem.METRIC,
     val isLoading: Boolean = true
 )
@@ -92,6 +96,7 @@ class CardioSessionViewModel @Inject constructor(
         SessionDetail(
             session = session,
             route = session?.let { GeoMath.normalise(cardioRepository.decodeRoute(it)) }.orEmpty(),
+            points = session?.let(cardioRepository::decodeRoute).orEmpty(),
             unit = user?.unitSystem ?: UnitSystem.METRIC,
             isLoading = false
         )
@@ -165,12 +170,13 @@ fun CardioSessionScreen(
                 androidx.compose.foundation.layout.Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
-                        .background(Slate800, RoundedCornerShape(Radius.card)),
+                        .height(300.dp)
+                        .clip(RoundedCornerShape(Radius.card))
+                        .background(Slate800),
                     contentAlignment = androidx.compose.ui.Alignment.Center
                 ) {
-                    if (detail.route.size >= 2) {
-                        RouteShape(detail.route, Modifier.fillMaxSize())
+                    if (detail.points.size >= 2) {
+                        RouteMap(points = detail.points, live = false, modifier = Modifier.fillMaxSize())
                     } else {
                         Caption("No GPS route was recorded for this session")
                     }
