@@ -6,6 +6,13 @@ import com.ironlog.app.data.dao.BodyDao
 import com.ironlog.app.data.dao.CardioDao
 import com.ironlog.app.data.dao.RoutineDao
 import com.ironlog.app.data.dao.WorkoutDao
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import com.ironlog.app.data.dao.UserDao
+import com.ironlog.app.data.dao.ExerciseDao
+import com.ironlog.app.data.dao.NutritionDao
+import com.ironlog.app.data.dao.StrengthGoalDao
+import com.ironlog.app.data.dao.RewardsDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -37,6 +44,12 @@ class ExportRepositoryImpl @Inject constructor(
     private val routineDao: RoutineDao,
     private val bodyDao: BodyDao,
     private val cardioDao: CardioDao,
+    private val userDao: UserDao,
+    private val exerciseDao: ExerciseDao,
+    private val nutritionDao: NutritionDao,
+    private val goalDao: StrengthGoalDao,
+    private val rewardsDao: RewardsDao,
+    private val dataStore: DataStore<Preferences>,
     private val currentUser: CurrentUser
 ) : ExportRepository {
 
@@ -110,23 +123,125 @@ class ExportRepositoryImpl @Inject constructor(
         },
         cardio = cardioDao.observeSessions(userId).first().map {
             BackupCardio(it.type.name, it.startedAt, it.distanceMeters, it.durationSeconds, it.steps, it.routeJson)
-        }
+        },
+        // The account row travels too, so a new phone can recreate it and the
+        // user signs in with the password they already know. Only the hash and
+        // its salt go: the password itself was never stored to begin with.
+        account = userDao.findById(userId)?.let { u ->
+            BackupAccount(
+                id = u.id, email = u.email, displayName = u.displayName,
+                passwordHash = u.passwordHash, passwordSalt = u.passwordSalt, createdAt = u.createdAt,
+                unitSystem = u.unitSystem.name, bodyweightKg = u.bodyweightKg, heightCm = u.heightCm,
+                biometricLockEnabled = u.biometricLockEnabled, restTimerDefaultSeconds = u.restTimerDefaultSeconds,
+                autoRestTimerEnabled = u.autoRestTimerEnabled, weeklyGoalWorkouts = u.weeklyGoalWorkouts
+            )
+        },
+        foods = nutritionDao.customFoods(userId).map { f ->
+            BackupFood(
+                id = f.id, name = f.name, group = f.group.name, kcalPer100g = f.kcalPer100g,
+                proteinPer100g = f.proteinPer100g, carbsPer100g = f.carbsPer100g, fatPer100g = f.fatPer100g,
+                servingGrams = f.servingGrams, servingLabel = f.servingLabel, barcode = f.barcode
+            )
+        },
+        foodLogs = run {
+            val names = HashMap<String, String>()
+            nutritionDao.allLogs(userId).map { log ->
+                val name = names.getOrPut(log.foodId) { nutritionDao.findFood(log.foodId)?.name ?: "" }
+                BackupFoodLog(log.foodId, name, log.grams, log.meal.name, log.loggedAt, log.note)
+            }
+        },
+        nutritionGoal = nutritionDao.findGoal(userId)?.let { g ->
+            BackupNutritionGoal(g.goal.name, g.sex.name, g.ageYears, g.activity.name, g.targetKcal, g.proteinG, g.carbsG, g.fatG, g.updatedAt)
+        },
+        strengthGoals = goalDao.allForUser(userId).map { g ->
+            BackupStrengthGoal(g.exerciseId, exerciseNameOf(g.exerciseId), g.metric.name, g.targetKg, g.createdAt, g.achievedAt)
+        },
+        questClaims = rewardsDao.allClaims(userId).map { BackupQuestClaim(it.questId, it.periodKey, it.coins, it.claimedAt) },
+        purchases = rewardsDao.allPurchases(userId).map { BackupPurchase(it.itemId, it.coinsSpent, it.purchasedAt, it.isEquipped) },
+        settings = SettingsBackup.snapshot(dataStore.data.first())
     )
+
+    private suspend fun exerciseNameOf(exerciseId: String): String =
+        exerciseDao.findById(exerciseId)?.name.orEmpty()
 }
 
 // Progress photos are deliberately left out of the backup: the JSON file is meant
 // to be shared, and a share sheet is the wrong place for body photos.
 
+/**
+ * Version 2 adds the account and everything else that belongs to a person:
+ * food, goals, rewards and settings. Every addition has a default, so a
+ * version-1 file still opens; a version-2 file on an old build is read for
+ * the fields it knows.
+ */
 @Serializable
 data class Backup(
     val format: String = "ironlog-backup",
-    val version: Int = 1,
+    val version: Int = 2,
     val exportedAt: Long,
     val workouts: List<BackupWorkout>,
     val routines: List<BackupRoutine>,
     val measurements: List<BackupMeasurement>,
-    val cardio: List<BackupCardio>
+    val cardio: List<BackupCardio>,
+    val account: BackupAccount? = null,
+    val foods: List<BackupFood> = emptyList(),
+    val foodLogs: List<BackupFoodLog> = emptyList(),
+    val nutritionGoal: BackupNutritionGoal? = null,
+    val strengthGoals: List<BackupStrengthGoal> = emptyList(),
+    val questClaims: List<BackupQuestClaim> = emptyList(),
+    val purchases: List<BackupPurchase> = emptyList(),
+    val settings: Map<String, String> = emptyMap()
 )
+
+/** The user row as stored: the password is not here because it never was anywhere. */
+@Serializable
+data class BackupAccount(
+    val id: String,
+    val email: String,
+    val displayName: String,
+    val passwordHash: String,
+    val passwordSalt: String,
+    val createdAt: Long,
+    val unitSystem: String,
+    val bodyweightKg: Double?,
+    val heightCm: Double?,
+    val biometricLockEnabled: Boolean,
+    val restTimerDefaultSeconds: Int,
+    val autoRestTimerEnabled: Boolean,
+    val weeklyGoalWorkouts: Int
+)
+
+@Serializable
+data class BackupFood(
+    val id: String,
+    val name: String,
+    val group: String,
+    val kcalPer100g: Double,
+    val proteinPer100g: Double,
+    val carbsPer100g: Double,
+    val fatPer100g: Double,
+    val servingGrams: Double,
+    val servingLabel: String,
+    val barcode: String?
+)
+
+@Serializable
+data class BackupFoodLog(val foodId: String, val foodName: String, val grams: Double, val meal: String, val loggedAt: Long, val note: String)
+
+@Serializable
+data class BackupNutritionGoal(
+    val goal: String, val sex: String, val ageYears: Int, val activity: String,
+    val targetKcal: Int, val proteinG: Int, val carbsG: Int, val fatG: Int, val updatedAt: Long
+)
+
+@Serializable
+data class BackupStrengthGoal(val exerciseId: String, val exerciseName: String, val metric: String, val targetKg: Double, val createdAt: Long, val achievedAt: Long?)
+
+@Serializable
+data class BackupQuestClaim(val questId: String, val periodKey: String, val coins: Int, val claimedAt: Long)
+
+@Serializable
+data class BackupPurchase(val itemId: String, val coinsSpent: Int, val purchasedAt: Long, val isEquipped: Boolean)
 
 @Serializable
 data class BackupWorkout(

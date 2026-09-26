@@ -5,6 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.ironlog.app.core.security.Validators
 import com.ironlog.app.data.repository.AuthField
 import com.ironlog.app.data.repository.AuthRepository
+import android.net.Uri
+import com.ironlog.app.core.security.wipe
+import com.ironlog.app.data.repository.BackupRepository
+import com.ironlog.app.data.repository.userMessage
 import com.ironlog.app.data.repository.AuthResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +29,13 @@ data class AuthUiState(
     val confirmPasswordError: String? = null,
     val generalError: String? = null,
     val isSubmitting: Boolean = false,
-    val isComplete: Boolean = false
+    val isComplete: Boolean = false,
+    /** A backup chosen on the sign-in screen, waiting on a passphrase or a confirmation. */
+    val restoreUri: Uri? = null,
+    val restoreNeedsPassphrase: Boolean = false,
+    val isRestoring: Boolean = false,
+    /** Shown once an account has been brought across from another phone. */
+    val restoreMessage: String? = null
 ) {
     val canSubmitSignIn: Boolean
         get() = email.isNotBlank() && password.isNotBlank() && !isSubmitting
@@ -37,7 +47,8 @@ data class AuthUiState(
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val backupRepository: BackupRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthUiState())
@@ -93,6 +104,53 @@ class AuthViewModel @Inject constructor(
     }
 
     fun showError(message: String) = _state.update { it.copy(generalError = message) }
+
+    // ------------------------------------------------------------ restore from another phone
+
+    /** A backup file was picked: find out whether it is sealed before asking for a passphrase. */
+    fun onRestoreFileChosen(uri: Uri) {
+        viewModelScope.launch {
+            backupRepository.isEncrypted(uri)
+                .onSuccess { sealed -> _state.update { it.copy(restoreUri = uri, restoreNeedsPassphrase = sealed, generalError = null) } }
+                .onFailure { e -> _state.update { it.copy(generalError = e.userMessage("Could not open that file")) } }
+        }
+    }
+
+    fun cancelRestore() = _state.update { it.copy(restoreUri = null, restoreNeedsPassphrase = false) }
+
+    /**
+     * Recreates the account in the backup and its data. The email is filled
+     * in afterwards; the password is the one the user has always used, which
+     * this phone learns only when they type it.
+     */
+    fun restoreAccount(passphrase: CharArray?) {
+        val uri = _state.value.restoreUri ?: run { passphrase?.wipe(); return }
+        _state.update { it.copy(isRestoring = true, generalError = null) }
+        viewModelScope.launch {
+            backupRepository.restoreAccount(uri, passphrase)
+                .onSuccess { restored ->
+                    val s = restored.summary
+                    val parts = listOf(
+                        s.workouts to "workouts", s.routines to "routines", s.cardio to "cardio sessions",
+                        s.measurements to "measurements", s.foodLogs to "food entries", s.goals to "goals"
+                    ).filter { (n, _) -> n > 0 }.map { (n, label) -> "$n $label" }
+                    val brought = if (parts.isEmpty()) "your settings" else parts.joinToString(", ")
+                    _state.update {
+                        it.copy(
+                            isRestoring = false, restoreUri = null, restoreNeedsPassphrase = false,
+                            email = restored.email, emailError = null,
+                            restoreMessage = "Welcome back, ${restored.displayName}. Your account is on this phone with " +
+                                "$brought. Sign in with your usual password."
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(isRestoring = false, restoreUri = null, restoreNeedsPassphrase = false, generalError = e.userMessage("Restore failed"))
+                    }
+                }
+        }
+    }
 
     fun signIn() {
         if (!_state.value.canSubmitSignIn) return
