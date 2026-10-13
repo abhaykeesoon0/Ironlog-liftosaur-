@@ -103,8 +103,6 @@ fun SettingsScreen(
     val muscleTint by viewModel.muscleTint.collectAsStateWithLifecycle()
     val trainingFocus by viewModel.trainingFocus.collectAsStateWithLifecycle()
     val stepSource by viewModel.stepSource.collectAsStateWithLifecycle()
-    var assistantKey by remember { mutableStateOf("") }
-    var keySaved by remember { mutableStateOf(viewModel.hasAssistantKey()) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val notifications = rememberPermissionState(AppPermission.NOTIFICATIONS)
@@ -285,60 +283,6 @@ fun SettingsScreen(
                         caption = "Workouts per week",
                         canDecrement = goal > 1,
                         canIncrement = goal < 14
-                    )
-                }
-            }
-
-            // ---------------------------------------------------------- assistant
-            Spacer(Modifier.height(Space.xl))
-            SectionHeader("Coach")
-            IronCard {
-                Column {
-                    Text(
-                        "Cloud assistant",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Chalk
-                    )
-                    Caption(
-                        "The coach answers from your log and a built-in reference, on this phone. " +
-                            "Add a Claude API key and you can also ask it anything else — that is the " +
-                            "one feature that sends data off the device, and it stays off until you add a key."
-                    )
-                    Spacer(Modifier.height(Space.md))
-                    IronTextField(
-                        value = assistantKey,
-                        onValueChange = { assistantKey = it },
-                        label = if (keySaved) "Key saved · enter a new one to replace" else "Claude API key",
-                        isPassword = true,
-                        placeholder = "sk-ant-..."
-                    )
-                    Spacer(Modifier.height(Space.sm))
-                    Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-                        SecondaryButton(
-                            text = "Save key",
-                            onClick = {
-                                viewModel.saveAssistantKey(assistantKey)
-                                assistantKey = ""
-                                keySaved = viewModel.hasAssistantKey()
-                            },
-                            enabled = assistantKey.isNotBlank(),
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (keySaved) {
-                            SecondaryButton(
-                                text = "Remove",
-                                onClick = {
-                                    viewModel.clearAssistantKey()
-                                    keySaved = false
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                    Caption(
-                        "Stored encrypted on this phone, in the same place as your session. It is never " +
-                            "put in the app itself, which anyone could unpack.",
-                        Modifier.padding(top = Space.sm)
                     )
                 }
             }

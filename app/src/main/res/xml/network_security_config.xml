@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The app is offline by design. The five hosts below are its only network
-    exceptions, each keyless (or keyed by the user) and opt-in. Everything is
+    exceptions, each keyless, and each one either opt-in or (the coach's web
+    lookup) switched off with one tap where it is used. Everything is
     HTTPS only, and each host is pinned to the root of its certificate chain
     with a backup, so a forged certificate from a compromised authority is
     refused. The pins expire after a year: past that date the platform falls
@@ -48,15 +49,6 @@
     <!-- Firebase Authentication, for the verification email: Google Trust Services Root R4 (backup R1). -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">googleapis.com</domain>
-        <pin-set expiration="2027-09-24">
-            <pin digest="SHA-256">mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</pin>
-            <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>
-        </pin-set>
-    </domain-config>
-
-    <!-- Anthropic (the user's own key): Google Trust Services Root R4 (backup R1). -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">anthropic.com</domain>
         <pin-set expiration="2027-09-24">
             <pin digest="SHA-256">mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</pin>
             <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>

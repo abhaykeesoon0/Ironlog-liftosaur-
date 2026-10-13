@@ -33,9 +33,11 @@ data class WebFact(
  * openly licensed (CC BY-SA for Wikipedia text) and are credited under the
  * answer with a link, because a fact the user cannot check is a rumour.
  *
- * This is opt-in, like the other two features that reach the network. Only
- * the topic of the question leaves the phone -- never the user's log -- and
- * the toggle is in the coach itself, where it is used.
+ * This is on by default, so a fresh install can answer a question the coach
+ * was not written with, and it is the one network feature that is: the other
+ * lookups are opt-in. Only the topic of the question leaves the phone -- never
+ * the user's log -- and the switch is in the coach itself, where it is used,
+ * so turning it off is one tap.
  */
 @Singleton
 class WebLookup @Inject constructor() {

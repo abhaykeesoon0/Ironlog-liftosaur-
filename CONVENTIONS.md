@@ -1,4 +1,4 @@
-# Liftosaur — project instructions for Claude Code
+# Liftosaur — project conventions
 
 Android strength-training tracker. The app was called IronLog until late in
 development: the user-facing name is Liftosaur, but the package

@@ -47,7 +47,7 @@ fun PrivacyScreen(onBack: () -> Unit) {
             Bullets(
                 "Everything lives in the app's private storage on this phone. The database is encrypted at rest with " +
                     "SQLCipher; its key is generated here and held in the Android Keystore.",
-                "Sign-in tokens, the API key you may add, and the database key sit in Keystore-encrypted preferences.",
+                "Sign-in tokens and the database key sit in Keystore-encrypted preferences.",
                 "Cloud backup and device-to-device transfer of the app's data are switched off in the manifest.",
                 "Optional app lock with fingerprint, face or screen lock. Photo screens block screenshots.",
                 "Five failed sign-ins start a growing wait before the next attempt."
@@ -55,12 +55,13 @@ fun PrivacyScreen(onBack: () -> Unit) {
 
             SectionHeader("What leaves the phone", Modifier.padding(top = Space.lg))
             Bullets(
-                "Nothing, unless you turn a feature on. Each one is opt-in and says so where you turn it on.",
+                "Very little. Apart from the coach's web lookups, which are on from the start and send only a topic, " +
+                    "each feature below is opt-in and says so where you turn it on.",
                 "Barcode lookup: the barcode digits go to Open Food Facts. No account, no key.",
                 "Exercise browser: search terms go to wger. No account, no key.",
-                "Coach web lookups: the topic of your question goes to DuckDuckGo or Wikipedia. Never your log.",
-                "Cloud assistant: your question plus a few lines of your training figures go to Anthropic, with a key " +
-                    "you supply. Off until you add one.",
+                "Coach web lookups: on by default. The topic of your question goes to DuckDuckGo or Wikipedia, with no " +
+                    "account and no key. Never your log, your figures or your name. Turn it off with the " +
+                    "\u201cLooking things up online\u201d chip on the Coach screen; it then reads \u201cOffline only\u201d.",
                 "Coach model on this phone: if you choose to download one, the file comes from huggingface.co once and " +
                     "is checked against its published checksum. After that the model answers on the phone and sends nothing.",
                 "Email verification: when you create an account, your email and password go to Firebase Authentication, " +
