@@ -81,7 +81,11 @@ interface ProfileRepository {
      */
     val welcomeSoundEnabled: Flow<Boolean>
 
-    /** Whether the coach may look a topic up on the open web. Off by default: the app is offline by design. */
+    /**
+     * Whether the coach may look a topic up on the open web. On by default:
+     * the lookup is keyless and sends only the topic, never the log, and the
+     * coach is switched to offline-only with one tap on its own screen.
+     */
     val webLookupsEnabled: Flow<Boolean>
     suspend fun setWebLookups(enabled: Boolean): Result<Unit>
 
@@ -154,7 +158,7 @@ class ProfileRepositoryImpl @Inject constructor(
         dataStore.data.map { prefs -> prefs[KEY_WELCOME_SOUND] ?: true }
 
     override val webLookupsEnabled: Flow<Boolean> =
-        dataStore.data.map { prefs -> prefs[KEY_WEB_LOOKUPS] ?: false }
+        dataStore.data.map { prefs -> prefs[KEY_WEB_LOOKUPS] ?: true }
 
     override suspend fun setWebLookups(enabled: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching { dataStore.edit { prefs -> prefs[KEY_WEB_LOOKUPS] = enabled }; Unit }

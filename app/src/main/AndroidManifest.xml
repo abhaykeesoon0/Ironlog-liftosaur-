@@ -41,9 +41,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!--
-        Used by one optional feature only: the cloud assistant, which is off
-        until the user turns it on and supplies their own API key. Everything
-        else in the app works with no network at all.
+        Used by the keyless lookups (the coach's web lookup, which sends only
+        the topic of a question; the barcode and exercise lookups), the one-off
+        coach-model download, the map tiles and the verification email. There
+        is no backend: the training log never goes over the network, and every
+        feature of the app still works with no connection at all.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- The map asks whether the phone is online before requesting tiles, so it can show a blank grid quietly instead of erroring. Normal permission, no prompt. -->

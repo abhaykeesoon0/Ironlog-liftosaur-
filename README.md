@@ -6,9 +6,10 @@ database, the preference files and the `IronLog` log tag keep the original
 name so existing installs and backups carry over.)
 
 The app is offline by design. There is no backend: accounts, tokens and the
-whole training log live on the phone, and the only network calls are the
-optional ones the user turns on (food lookup, the online exercise library,
-and the cloud coach with the user's own API key).
+whole training log live on the phone. The only network calls are keyless:
+the coach's web lookup, which sends the topic of a question and is on by
+default, and the optional ones the user turns on (food lookup and the online
+exercise library).
 
 ## Features
 
@@ -33,12 +34,15 @@ and the cloud coach with the user's own API key).
 - **Strength goals** — a target weight or estimated 1RM per exercise, with
   progress on Home and a chart per goal.
 - **Coach** — an offline question-and-answer coach with a recovery model per
-  muscle. Four optional brains sit on top of it, every one off until the user
-  turns it on: a keyless web lookup for facts; on-device Gemini Nano where the
-  phone has it; a language model downloaded once from a public repository
-  (Qwen 2.5, 550 MB or 1.6 GB) and run on the handset by MediaPipe with no key
-  and no connection; and Claude in the cloud with the user's own API key. All
-  of them read the same brief: the user's own figures and the web extract.
+  muscle. It looks facts up on its own through a keyless web lookup
+  (DuckDuckGo, then Wikipedia), on by default and switched off with one chip
+  on the Coach screen; only the topic of the question is sent, never the log.
+  Two optional models sit on top of it, each off until the user turns it on:
+  on-device Gemini Nano where the phone has it, and a language model
+  downloaded once from a public repository (Qwen 2.5, 550 MB or 1.6 GB) and
+  run on the handset by MediaPipe with no key and no connection. Both read the
+  same brief: the user's own figures and the web extract. No cloud model and
+  no API key anywhere.
 
 ### Body and cardio
 
@@ -180,7 +184,7 @@ MVVM throughout: Composable screen → ViewModel → Repository → DAO → Room
 Hilt provides dependencies. Every repository method returns a `Result`, and
 ViewModels turn failures into user-facing messages; nothing is silently
 swallowed. Weights are stored in kilograms and converted for display only.
-See `CLAUDE.md` for the conventions the codebase follows.
+See `CONVENTIONS.md` for the conventions the codebase follows.
 
 ## Tests
 

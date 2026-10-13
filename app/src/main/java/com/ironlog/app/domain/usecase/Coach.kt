@@ -12,7 +12,7 @@ import com.ironlog.app.data.entity.MuscleGroup
  * works with no network, no API key and no data leaving the phone, it cannot
  * invent a number, and every answer can be traced to a rule and a row. What it
  * gives up is the ability to answer a question nobody anticipated -- which is
- * what the optional cloud assistant is for.
+ * what the keyless web lookup and the models on the phone are for.
  *
  * Health questions have a floor under them: anything that sounds like pain or
  * illness is answered by saying to see a professional, not by guessing.
@@ -266,8 +266,8 @@ object Coach {
         "I can answer questions about training, recovery, programming and your own numbers — what to " +
             "train today, how to add weight, how much to rest, how you are progressing.\n\n" +
             "I am a built-in coach rather than a language model, so I only know what I was written " +
-            "with and what is in your log. For anything broader, turn on web lookups below, or the " +
-            "cloud assistant in Settings.",
+            "with and what is in your log. For anything broader I look the topic up online; if the " +
+            "chip below says \u201cOffline only\u201d, switch it back on, or download a model on this phone.",
         "Coach",
         isFallback = true
     )

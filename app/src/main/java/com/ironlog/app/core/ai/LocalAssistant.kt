@@ -15,11 +15,11 @@ import javax.inject.Singleton
 /**
  * The downloaded model, answering on the phone.
  *
- * This is the coach's third brain, between Gemini Nano (only on some phones)
- * and Claude (only with the user's own key): a model file the user fetched
- * once, run by an on-device inference library. No key, no account, and after
- * the download nothing leaves the handset. It reads the same brief the other
- * two get: the user's own figures, and a web extract when lookups are on.
+ * This is the coach's second model, beside Gemini Nano (only on some phones):
+ * a model file the user fetched once, run by an on-device inference library.
+ * No key, no account, and after the download nothing leaves the handset. It
+ * reads the same brief Nano gets: the user's own figures, and a web extract
+ * unless lookups are switched off.
  *
  * Loading the model costs seconds and a good slice of memory, so the engine
  * is built once and kept, and questions queue behind a lock rather than

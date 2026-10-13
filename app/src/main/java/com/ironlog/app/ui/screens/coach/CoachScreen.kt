@@ -125,8 +125,9 @@ fun CoachScreen(
             }
         }
 
-        // What the coach may reach for. Web lookups are keyless and send only
-        // the topic; the cloud sends the question with the user's figures.
+        // Whether the coach may reach for the web. Lookups are on by default,
+        // keyless, and send only the topic of the question, never the log; the
+        // chip is here, where it is used, so switching it off is one tap.
         Row(
             Modifier.fillMaxWidth().padding(horizontal = Space.lg),
             horizontalArrangement = Arrangement.spacedBy(Space.xs),
@@ -136,16 +137,6 @@ fun CoachScreen(
                 text = if (state.webLookups) "Looking things up online" else "Offline only",
                 selected = state.webLookups
             ) { viewModel.setWebLookups(!state.webLookups) }
-            if (state.cloudAvailable) {
-                IronChip(
-                    text = when {
-                        state.useCloud -> "Asking Claude"
-                        state.localModel.isReady -> "Model on this phone"
-                        else -> "Built-in coach"
-                    },
-                    selected = state.useCloud
-                ) { viewModel.setUseCloud(!state.useCloud) }
-            }
         }
 
         Row(
@@ -265,7 +256,7 @@ private fun LocalModelCard(
                     Text("Answer with a model on this phone", style = MaterialTheme.typography.titleMedium, color = Chalk)
                     Caption(
                         "A real language model, downloaded once and run on the handset. No key, no account, and " +
-                            "nothing leaves the phone afterwards. It reads your figures and, when lookups are on, the web."
+                            "nothing leaves the phone afterwards. It reads your figures and, unless lookups are off, the web."
                     )
                     Spacer(Modifier.height(Space.sm))
                     Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
