@@ -109,10 +109,20 @@ fun RouteMap(
                     // Following the runner: the whole route stays in view, and the
                     // map only moves when the newest fix has left the frame, so a
                     // pinch or a drag is not undone on the very next fix.
-                    val visible = map.boundingBox
-                    val inFrame = last != null && visible.latitudeSpan > 0 && visible.contains(last)
-                    if (!inFrame || map.zoomLevelDouble > 18.0) {
-                        map.zoomToBoundingBox(BoundingBox.fromGeoPointsSafe(geo).padded(), true, FRAME_PADDING_PX)
+                    val box = BoundingBox.fromGeoPointsSafe(geo).padded()
+                    if (map.width == 0 || map.height == 0) {
+                        // Returning to a session already under way: the update runs
+                        // while the view is being attached, before it has a size, and
+                        // osmdroid's zoomToBoundingBox never converges on a zero-sized
+                        // map (it loops on the main thread until the app is killed).
+                        // Frame the route once the first layout has given it a size.
+                        map.post { map.zoomToBoundingBox(box, false, FRAME_PADDING_PX) }
+                    } else {
+                        val visible = map.boundingBox
+                        val inFrame = last != null && visible.latitudeSpan > 0 && visible.contains(last)
+                        if (!inFrame || map.zoomLevelDouble > 18.0) {
+                            map.zoomToBoundingBox(box, true, FRAME_PADDING_PX)
+                        }
                     }
                 }
                 else -> map.post {
