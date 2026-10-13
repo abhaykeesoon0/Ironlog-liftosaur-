@@ -1,6 +1,6 @@
 # Liftosaur v1.0.0 — coursework submission
 
-Liftosaur is an offline-first strength-training tracker for Android 8.0 and above, built in Kotlin and Jetpack Compose as a single-activity app with Room, SQLCipher and Hilt. A lifter plans routines, logs every set with weight, reps and rest, and sees records, volume, recovery and a body map of what they trained; around that core sit outdoor cardio with GPS and a live map, a food log with a barcode scanner, strength goals, a rewards system and a coach that answers from the user's own figures. There is no backend: accounts, tokens and the whole log live on the phone in an encrypted database, and a backup that leaves it can be sealed under a passphrase. This is the build submitted for the Mobile Application Development module, tagged `v1.0.0`, from commit `3b24a4a` on branch `kotlin-upgrade` (also pushed as `main`).
+Liftosaur is an offline-first strength-training tracker for Android 8.0 and above, built in Kotlin and Jetpack Compose as a single-activity app with Room, SQLCipher and Hilt. A lifter plans routines, logs every set with weight, reps and rest, and sees records, volume, recovery and a body map of what they trained; around that core sit outdoor cardio with GPS and a live map, a food log with a barcode scanner, strength goals, a rewards system and a coach that answers from the user's own figures. There is no backend: accounts, tokens and the whole log live on the phone in an encrypted database, and a backup that leaves it can be sealed under a passphrase. This is the build submitted for the Mobile Application Development module, tagged `v1.0.0` on branch `kotlin-upgrade`. The app code is that of commit `3b24a4a`; the commits after it add only repository documents.
 
 ## What is in this release
 
@@ -55,7 +55,7 @@ Liftosaur is an offline-first strength-training tracker for Android 8.0 and abov
 - `Liftosaur-release-universal.apk`: the same build for any ABI, including Intel emulators (70 MB).
 - `Liftosaur-demo.mp4`: an 8 min 52 s screen recording (720 x 1560, no sound) on a Galaxy S25 Ultra, on a demo account seeded with eight weeks of training, in five parts: 0:00 Home and routines; 1:22 a workout from start to finish; 3:22 History, Progress, the coach and quests; 5:23 Nutrition, body, cardio, Settings and the privacy page; 7:58 the three-page introduction.
 - `Liftosaur-report.pdf`: the coursework report, covering the four assessed areas, testing, challenges and limitations.
-- `Liftosaur-source-code.md`: every text file tracked in the repository at commit `3b24a4a`, in one Markdown document. Binary files (icons, drawables, the exercise demo animations) are not in it.
+- `Liftosaur-source-code.md`: every text file tracked in the repository at the `v1.0.0` tag, in one Markdown document. Binary files (icons, drawables, the exercise demo animations) are not in it.
 
 ## Install
 1. On the phone, allow installing from unknown sources for the browser or file manager you will open the APK with.
