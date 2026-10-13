@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Binaries are never line-ending normalised or diffed as text.
+*.apk binary
+*.mp4 binary
